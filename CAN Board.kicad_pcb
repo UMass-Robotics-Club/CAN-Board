@@ -36068,28 +36068,12 @@
 		(uuid "d603abd5-e04f-45f9-b151-24146ea9061c")
 	)
 	(segment
-		(start 57.825 51)
-		(end 57.825 52.45)
-		(width 0.1524)
-		(layer "F.Cu")
-		(net 18)
-		(uuid "74ed2680-c530-4391-b05a-6ba537308a44")
-	)
-	(segment
 		(start 57.825 52.45)
 		(end 57.775 52.5)
 		(width 0.1524)
 		(layer "F.Cu")
 		(net 18)
 		(uuid "aa8b3ec5-80b4-4949-a6e2-829b8686225b")
-	)
-	(segment
-		(start 57.825 49)
-		(end 57.825 47.55)
-		(width 0.1524)
-		(layer "F.Cu")
-		(net 19)
-		(uuid "8a5ee5d6-36f3-442e-9ab3-8308b25f3023")
 	)
 	(segment
 		(start 57.825 47.55)
