@@ -6811,7 +6811,7 @@
 		)
 		(uuid "6d90d6ae-5617-4cc7-9d8a-fde8f8ec08fd")
 	)
-	(label "ucd-"
+	(label "ucd+"
 		(at 90.17 66.04 0)
 		(fields_autoplaced yes)
 		(effects
@@ -6855,7 +6855,7 @@
 		)
 		(uuid "a32cd003-cf21-4a8d-b538-5186212a6531")
 	)
-	(label "ucd+"
+	(label "ucd-"
 		(at 90.17 68.58 0)
 		(fields_autoplaced yes)
 		(effects
