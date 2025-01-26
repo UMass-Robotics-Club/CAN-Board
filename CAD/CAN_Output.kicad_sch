@@ -2121,7 +2121,6 @@
 	)
 	(label "OSC1"
 		(at 45.72 146.05 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2132,7 +2131,6 @@
 	)
 	(label "OSC1"
 		(at 78.74 85.09 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2143,7 +2141,6 @@
 	)
 	(label "OSC2"
 		(at 60.96 146.05 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2154,7 +2151,6 @@
 	)
 	(label "OSC2"
 		(at 78.74 82.55 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2166,7 +2162,6 @@
 	(hierarchical_label "nCS"
 		(shape output)
 		(at 154.94 85.09 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2178,7 +2173,6 @@
 	(hierarchical_label "CANL"
 		(shape output)
 		(at 158.75 107.95 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2190,7 +2184,6 @@
 	(hierarchical_label "SDO"
 		(shape input)
 		(at 154.94 87.63 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2202,7 +2195,6 @@
 	(hierarchical_label "SCK"
 		(shape output)
 		(at 154.94 92.71 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2214,7 +2206,6 @@
 	(hierarchical_label "nINT1"
 		(shape output)
 		(at 78.74 92.71 180)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2226,7 +2217,6 @@
 	(hierarchical_label "SDI"
 		(shape output)
 		(at 154.94 90.17 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2238,7 +2228,6 @@
 	(hierarchical_label "nINT"
 		(shape output)
 		(at 78.74 80.01 180)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2250,7 +2239,6 @@
 	(hierarchical_label "CANH"
 		(shape output)
 		(at 170.18 105.41 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2367,7 +2355,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "11.5p"
+		(property "Value" "18p"
 			(at 41.91 151.1299 0)
 			(effects
 				(font
@@ -2543,7 +2531,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "11.5p"
+		(property "Value" "18p"
 			(at 66.04 151.1299 0)
 			(effects
 				(font
@@ -3419,7 +3407,7 @@
 				)
 			)
 		)
-		(property "Value" "Crystal_GND24"
+		(property "Value" "40MHz"
 			(at 67.31 142.2714 0)
 			(effects
 				(font
@@ -3436,7 +3424,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "~"
+		(property "Datasheet" "ABM8G-40.000MHZ-18-D2Y-T"
 			(at 55.88 146.05 0)
 			(effects
 				(font
