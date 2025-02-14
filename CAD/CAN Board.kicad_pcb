@@ -22991,6 +22991,7 @@
 		(property "Reference" "R20"
 			(at 0 -1.43 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "90a66500-0dc3-40d8-86bf-db10c6681aaf")
 			(effects
 				(font
