@@ -23,6 +23,8 @@ uint can_rx_int_pins[6] = {28,24,22,20,18,16};
 #define EXT_SPI_SCK 14
 
 // External GPIO
-
+#define EXT_GPIO_15 15
+#define EXT_GPIO_26 26
+#define EXT_GPIO_27 27
 
 #endif // PINS_H
