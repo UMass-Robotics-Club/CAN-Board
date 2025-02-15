@@ -50,12 +50,12 @@ This board has 6 independent CAN lines driven by 6 [MCP251863T-E/9PX](https://ww
 | 29 | CAN1 INT |
 
 Notes:
-* SPI0 is the internal SPI bus which connects to the CAN controllers with `SPI0 CS X` being the chip select for CAN controller X.
-* SPI1 is the SPI bus exposed over the SPI connector.
+* `SPI0` is the internal SPI bus which connects to the CAN controllers with `SPI0 CS X` being the chip select for CAN controller X.
+* `SPI1` is the SPI bus exposed over the SPI connector.
 * `GPIO 15 (GPIO pin 1)` is attached to a mosfet and LED as an indicator and therefore should have pull down enabled if being used as an input.
 * `GPIO 26 & 27 (GPIO pin 26 & 27)` can be used an analog inputs.
 * `CANX INT` is a general purpose interrupt pin for CAN controller X that will trigger when any interrupt in the CAN controller is triggered. This pin is inverted (active LOW).
-* `CANX RX INT` is configurable to either trigger when CAN controller X's RX interrupt is triggered or be used as a GPIO pin. As an interrupt, this pin is inverted (active LOW).
+* `CANX RX INT` is configurable to trigger when CAN controller X's RX interrupt is triggered. As an interrupt, this pin is inverted (active LOW).
 
 ## Project Structure
 * CAD: The kiCAD project (PCB/schematics)
