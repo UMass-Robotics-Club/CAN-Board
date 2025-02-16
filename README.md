@@ -13,7 +13,7 @@ Features:
     * GPIO
 * SWD debugging
 
-This board has 6 independent CAN lines driven by 6 [MCP251863T-E/9PX](https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/MCP251863-External-CAN-FD-Controller-with-Integrated-Transceiver-DS20006624.pdf) CAN controllers. Each CAN controller is interfaced with a central microcontroller through an internal SPI bus along with 2 interrupt/GPIO pins.
+This board has 6 independent CAN lines driven by 6 [MCP251863T-E/9PX](https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/MCP251863-External-CAN-FD-Controller-with-Integrated-Transceiver-DS20006624.pdf) CAN controllers. Each CAN controller is interfaced with the central microcontroller through an internal SPI bus along with 2 interrupt pins for general purpose and RX interrupts. There is also a STBY pin for the CAN transceiver that is connected to the XSTBY pin on the CAN controller.
 
 ## RP2040 Pinout
 | GPIO | Function |
@@ -58,9 +58,10 @@ Notes:
 * `CANX RX INT` is configurable to trigger when CAN controller X's RX interrupt is triggered. As an interrupt, this pin is inverted (active LOW).
 
 ## Project Structure
-* CAD: The kiCAD project (PCB/schematics)
-    * Components: Imported components each in their own folder
-    * Fab: All the fabrication files including BOM, gerber, and component placement
-* code: Firmware for microcontroller
-    * TODO
-* images: All the images
+* `CAD`: The kiCAD project (PCB/schematics)
+    * `Components`: Imported components each in their own folder
+    * `Fab`: All the fabrication files including BOM, gerber, and component placement
+* `code`: Firmware for the microcontroller in a pretty standard C project structure
+    * `include`: Header files
+    * `src`: C/C++ files
+* `images`: All the images

@@ -98,6 +98,7 @@ int main() {
     init_ext_spi();
     setup_can_controllers(&(can_bitrate_t){.profile=CAN_BITRATE});
 
+    //TODO figure out what to do for main loop
 
     // Create a CAN frame with 11-bit ID of 0x123 and 5 byte payload of deadbeef00
     uint8_t data[4] = {0xdeU, 0xadU, 0xbeU, 0xefU};
