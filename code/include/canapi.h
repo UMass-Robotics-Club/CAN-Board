@@ -400,6 +400,7 @@ can_status_t can_get_status(can_controller_t *controller);
 void can_status_request_recover(can_controller_t *controller);
 
 //////////////////////////////////////////// CAN frame /////////////////////////////////////////////
+
 /// @brief Put the CAN frame into the queue (priority or FIFO)
 /// @param fifo If true, puts the frame into the FIFO queue that feeds into the priority queue
 can_errorcode_t can_send_frame(can_controller_t *controller, const can_frame_t *frame, bool fifo);
