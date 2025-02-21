@@ -9083,7 +9083,7 @@
 	)
 	(global_label "GPIO 15"
 		(shape bidirectional)
-		(at 214.63 69.85 180)
+		(at 214.63 77.47 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -9093,7 +9093,7 @@
 		)
 		(uuid "b3a42385-cace-49d3-af02-837e5904564b")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 202.6716 69.85 0)
+			(at 202.6716 77.47 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12224,7 +12224,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder"
+		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
 			(at 220.472 68.58 90)
 			(effects
 				(font
@@ -13218,76 +13218,6 @@
 			(project ""
 				(path "/7d82ce85-7222-412b-9514-e26c0dea1256"
 					(reference "#PWR075")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 214.63 73.66 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "c494b36e-eac0-41bd-ad3c-04c9b6ce34b2")
-		(property "Reference" "R20"
-			(at 217.17 72.3899 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "220"
-			(at 217.17 74.9299 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder"
-			(at 212.852 73.66 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 214.63 73.66 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 214.63 73.66 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "db9b2bf7-0f5d-4d08-8231-fb919f8a7a94")
-		)
-		(pin "2"
-			(uuid "27dbd800-2c8b-4518-b934-684e7e557214")
-		)
-		(instances
-			(project ""
-				(path "/7d82ce85-7222-412b-9514-e26c0dea1256"
-					(reference "R20")
 					(unit 1)
 				)
 			)
