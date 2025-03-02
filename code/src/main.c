@@ -11,6 +11,7 @@
 #define ENABLE_ERROR
 
 #include "logging.h"
+#include "rev/CANSparkFrames.h"
 
 ///////////////////////////////////////
 // User params
@@ -49,7 +50,7 @@ void setup_can_controllers(can_bitrate_t *bitrate) {
     debug("CAN setup: IRQ handler added!\n")
 
     for(uint8_t i = 0; i < 6; i++){
-        debug("CAN setup: Controller %d: Staring setup...\n", i+1);
+        debug("CAN setup: Controller %d: Staring setup...\n", i);
 
         // bind interface
         can_controllers[i].host_interface = (can_interface_t){
@@ -70,7 +71,7 @@ void setup_can_controllers(can_bitrate_t *bitrate) {
 
             // This can fail if the CAN transceiver isn't powered up properly. That might happen
             // if the board had 3.3V but not 5V (the transceiver needs 5V to operate). 
-            error("CAN Setup: Controller %d: Failed to initialize with error code %d. Will retry in 1 second...\n", i+1, rc)
+            error("CAN Setup: Controller %d: Failed to initialize with error code %d. Will retry in 1 second...\n", i, rc)
             sleep_ms(1000);
         }
 
@@ -103,15 +104,12 @@ typedef struct __attribute__((packed)) {
 } can_command_header_t;
 
 void loop() {
-    // TODO: figure out what to do for main loop
-    // Right now it will just get input from SPI and send it over CAN
-
     // get header
     can_command_header_t header;
     spi_read_blocking(EXT_SPI, 0, (uint8_t*)&header, sizeof(header));
 
     if(header.controller_num > 5){
-        error("Command header: Invalid CAN controller number: %d", header.controller_num+1)
+        error("Command header: Invalid CAN controller number: %d", header.controller_num)
         return;
     }
 
@@ -133,10 +131,10 @@ void loop() {
             // happen if the CAN controller is connected to a CAN bus but there are no
             // other CAN controllers connected and able to ACK a CAN frame, so the
             // transmit queue fills up and then cannot accept any more frames.
-            error("CAN send: Error on controller %d: %d,\n", header.controller_num+1, rc);
+            error("CAN send: Error on controller %d: %d,\n", header.controller_num, rc);
         }
         else {
-            debug("CAN send: Frame queued OK on controller %d\n", header.controller_num+1);
+            debug("CAN send: Frame queued OK on controller %d\n", header.controller_num);
             break;
         }
     }
