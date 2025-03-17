@@ -41,3 +41,13 @@ cmake ..
 make
 ```
 4. The output files should be inside the `build` folder
+
+## Upload
+```
+sudo openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -c "adapter speed 5000" -c "program can_board.elf verify reset exit"
+```
+
+## debug
+```
+gdb ./build/can_board.elf -ex 'set arch arm' -ex 'target extended-remote :3333'
+```

@@ -364,6 +364,8 @@ uint32_t WEAK TIME_CRITICAL can_isr_callback_uref(can_uref_t uref)
 #define             TRIS1           (1U << 1)
 #define             TRIS0           (1U << 0)
 #define             XSTBYEN         (1U << 6)
+#define             LAT0            (1U << 8)
+#define             LAT1            (1U << 9)
 #define         CRC             (0xe08U)
 #define         ECCCON          (0xe0cU)
 #define         ECCSTAT         (0xe10U)
@@ -1348,6 +1350,9 @@ can_errorcode_t TIME_CRITICAL can_setup_controller(can_controller_t *controller,
     if ((options & CAN_OPTION_OPEN_DRAIN) && !(iocon & TXCANOD)) {
         return CAN_ERC_BAD_WRITE;
     }
+
+    // enable standby
+    write_word(spi_interface, IOCON, (iocon & ~TRIS0) | PM0 | XSTBYEN);
 
     // Set the bit rate values according to the profile, default to 500K if an unknown profile
     switch (bitrate->profile) {

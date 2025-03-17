@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "pico/stdlib.h"
 #include "pins.h"
 #include "canapi.h"
@@ -11,14 +9,13 @@
 #define ENABLE_ERROR
 
 #include "logging.h"
-#include "rev/CANSparkFrames.h"
 
 ///////////////////////////////////////
 // User params
 ///////////////////////////////////////
 
 #define EXT_SPI_BAUD 1000000
-#define CAN_BITRATE CAN_BITRATE_500K_75
+#define CAN_BITRATE CAN_BITRATE_1M_75
 
 
 can_controller_t can_controllers[6];
@@ -50,6 +47,10 @@ void setup_can_controllers(can_bitrate_t *bitrate) {
     debug("CAN setup: IRQ handler added!\n")
 
     for(uint8_t i = 0; i < 6; i++){
+        // three is broken for rn
+        if (i == 3)
+            continue;
+        
         debug("CAN setup: Controller %d: Staring setup...\n", i);
 
         // bind interface
@@ -63,16 +64,21 @@ void setup_can_controllers(can_bitrate_t *bitrate) {
             .magic = 0x1e5515f0U,
         };
 
+        // setup interrupt pin as input (don't know why but breaks without this)
+        gpio_init(can_int_pins[i]);
+
         // setup controller
         while (true) {
-            can_errorcode_t rc = can_setup_controller(can_controllers + i, bitrate, CAN_NO_FILTERS, CAN_MODE_NORMAL, CAN_OPTIONS_NONE);
-            if (rc == CAN_ERC_NO_ERROR) 
+            can_errorcode_t rc = can_setup_controller(can_controllers + i, bitrate, CAN_NO_FILTERS, CAN_MODE_NORMAL, CAN_OPTION_HARD_RESET);
+            
+            if (rc == CAN_ERC_NO_ERROR)
                 break;
-
+            
             // This can fail if the CAN transceiver isn't powered up properly. That might happen
             // if the board had 3.3V but not 5V (the transceiver needs 5V to operate). 
             error("CAN Setup: Controller %d: Failed to initialize with error code %d. Will retry in 1 second...\n", i, rc)
             sleep_ms(1000);
+            continue;
         }
 
         debug("CAN setup: Controller %d: Done setting up!\n", i+1)
@@ -140,12 +146,45 @@ void loop() {
     }
 }
 
+void test_controller(int i){
+    // Create a CAN frame
+    can_frame_t my_tx_frame;
+    can_make_frame(&my_tx_frame, false, 0xaa, 12, "hello world!", false);
+
+    while(1){
+        can_errorcode_t rc = can_send_frame(can_controllers + i, &my_tx_frame, false);
+        if (rc != CAN_ERC_NO_ERROR) {
+            // This can happen if there is no room in the transmit queue, which can
+            // happen if the CAN controller is connected to a CAN bus but there are no
+            // other CAN controllers connected and able to ACK a CAN frame, so the
+            // transmit queue fills up and then cannot accept any more frames.
+            error("CAN send: Error on controller %d: %d,\n", i, rc);
+        }
+        else {
+            debug("CAN send: Frame queued OK on controller %d\n", i);
+        }
+        sleep_ms(1000);
+    }
+}
+
 int main() {
     stdio_init_all();
-    init_ext_spi();
-    setup_can_controllers(&(can_bitrate_t){.profile=CAN_BITRATE});
 
-    info("CAN board ready!")
+    // while(!stdio_usb_connected()){}
+
+    gpio_init(EXT_GPIO_15);
+    gpio_set_dir(EXT_GPIO_15, 1);
+    gpio_put(EXT_GPIO_15, 0);
+
+    info("Starting setup...")
+
+    init_ext_spi();
+    can_bitrate_t bitrate = {.profile=CAN_BITRATE};
+    setup_can_controllers(&bitrate);
+
+    info("CAN board ready!\n")
+
+    test_controller(1);
 
     while(1)
         loop();
