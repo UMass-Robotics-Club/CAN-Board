@@ -15,43 +15,32 @@
 ///////////////////////////////////////
 
 #define EXT_SPI_BAUD 1000000
-#define CAN_BITRATE CAN_BITRATE_1M_75
+#define CAN_BITRATE CAN_BITRATE_1M_50
+#define MAX_TRYS 1
 
+// get protocol data over stdio else it will use SPI
+#define PKT_OVER_STDIO
+
+
+
+#ifdef PKT_OVER_STDIO
+    #define read_bytes(buff, len) fread(buff, len, 1, stdin);
+    #define write_bytes(buff, len) fwrite(buff, len, 1, stdin);
+#else
+    #define read_bytes(buff, len) spi_read_blocking(EXT_SPI, 0, buff, len);
+    #define write_bytes(buff, len) spi_write_blocking(EXT_SPI, buff, len);
+#endif
 
 can_controller_t can_controllers[6];
-
-/**
- * Handles IRQs by calling mcp25xxfd_irq_handler on the controller that triggered the interrupt.
- */
-void TIME_CRITICAL can_irq_handler(void)
-{
-    for(uint8_t i = 0; i < 6; i++) {
-        uint8_t spi_irq = can_controllers[i].host_interface.spi_irq;
-        uint32_t events = gpio_get_irq_event_mask(spi_irq); 
-
-        if (events & GPIO_IRQ_LEVEL_LOW) {
-            mcp25xxfd_irq_handler(can_controllers + i);
-        }
-    }
-}
 
 /**
  * Binds the interfaces for the 6 CAN controllers and sets them up by calling can_setup_controller and adding an IRQ handler.
  */
 void setup_can_controllers(can_bitrate_t *bitrate) {
     debug("CAN setup: Starting setup...\n")
-    
-    // add IRQ handler to call the IRQ handler on the correct CAN controller
-    irq_add_shared_handler(IO_IRQ_BANK0, can_irq_handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
-
-    debug("CAN setup: IRQ handler added!\n")
 
     for(uint8_t i = 0; i < 6; i++){
-        // three is broken for rn
-        if (i == 3)
-            continue;
-        
-        debug("CAN setup: Controller %d: Staring setup...\n", i);
+        debug("CAN setup: Controller %d: Staring setup...\n", i)
 
         // bind interface
         can_controllers[i].host_interface = (can_interface_t){
@@ -81,7 +70,7 @@ void setup_can_controllers(can_bitrate_t *bitrate) {
             continue;
         }
 
-        debug("CAN setup: Controller %d: Done setting up!\n", i+1)
+        debug("CAN setup: Controller %d: Done setting up!\n", i)
     }
 
     debug("CAN setup: Done setting up!\n")
@@ -112,32 +101,46 @@ typedef struct __attribute__((packed)) {
 void loop() {
     // get header
     can_command_header_t header;
-    spi_read_blocking(EXT_SPI, 0, (uint8_t*)&header, sizeof(header));
+    read_bytes(&header, sizeof(header))
 
     if(header.controller_num > 5){
-        error("Command header: Invalid CAN controller number: %d", header.controller_num)
+        error("Command header: Invalid CAN controller number: %d\n", header.controller_num)
         return;
     }
 
+    debug("Got header: (channel=%hhd, size=%hhd)\n", header.controller_num, header.data_len)
+
     // get arbitration (29 bit)
     uint32_t arbitration;
-    spi_read_blocking(EXT_SPI, 0, (uint8_t*)&arbitration, 4);
+    read_bytes(&arbitration, sizeof(arbitration));
+
+    debug("Got arbitration: %x\n", arbitration)
+
     // get CAN frame data
     uint8_t buffer[32];
-    spi_read_blocking(EXT_SPI, 0, buffer, header.data_len);
+    read_bytes(buffer, header.data_len);
+
+    debug("Got data\n")
 
     // Create a CAN frame
     can_frame_t my_tx_frame;
     can_make_frame(&my_tx_frame, true, arbitration, header.data_len, buffer, false);
-
-    while(1){
+    
+    for(uint8_t retry = 0; retry < MAX_TRYS; retry++){
+        gpio_put(EXT_GPIO_15, 0);
         can_errorcode_t rc = can_send_frame(can_controllers + header.controller_num, &my_tx_frame, false);
+        gpio_put(EXT_GPIO_15, 1);
         if (rc != CAN_ERC_NO_ERROR) {
             // This can happen if there is no room in the transmit queue, which can
             // happen if the CAN controller is connected to a CAN bus but there are no
             // other CAN controllers connected and able to ACK a CAN frame, so the
             // transmit queue fills up and then cannot accept any more frames.
-            error("CAN send: Error on controller %d: %d,\n", header.controller_num, rc);
+            if(retry + 1 == MAX_TRYS){
+                error("CAN send: Failure on controller %d: (err=%d, retries=%d)\n", header.controller_num, rc, retry)
+            } else {
+                warning("CAN send: Error on controller %d: (err=%d, retries=%d), will retry in 1 second\n", header.controller_num, rc, retry)
+                sleep_ms(1000);
+            }
         }
         else {
             debug("CAN send: Frame queued OK on controller %d\n", header.controller_num);
@@ -146,35 +149,13 @@ void loop() {
     }
 }
 
-void test_controller(int i){
-    // Create a CAN frame
-    can_frame_t my_tx_frame;
-    can_make_frame(&my_tx_frame, false, 0xaa, 12, "hello world!", false);
-
-    while(1){
-        can_errorcode_t rc = can_send_frame(can_controllers + i, &my_tx_frame, false);
-        if (rc != CAN_ERC_NO_ERROR) {
-            // This can happen if there is no room in the transmit queue, which can
-            // happen if the CAN controller is connected to a CAN bus but there are no
-            // other CAN controllers connected and able to ACK a CAN frame, so the
-            // transmit queue fills up and then cannot accept any more frames.
-            error("CAN send: Error on controller %d: %d,\n", i, rc);
-        }
-        else {
-            debug("CAN send: Frame queued OK on controller %d\n", i);
-        }
-        sleep_ms(1000);
-    }
-}
-
 int main() {
     stdio_init_all();
 
-    // while(!stdio_usb_connected()){}
-
+    // Turn off led for start
     gpio_init(EXT_GPIO_15);
     gpio_set_dir(EXT_GPIO_15, 1);
-    gpio_put(EXT_GPIO_15, 0);
+    gpio_put(EXT_GPIO_15, 1);
 
     info("Starting setup...")
 
@@ -182,9 +163,10 @@ int main() {
     can_bitrate_t bitrate = {.profile=CAN_BITRATE};
     setup_can_controllers(&bitrate);
 
-    info("CAN board ready!\n")
+    // disable all interrupts
+    irq_set_enabled(IO_IRQ_BANK0, false);
 
-    test_controller(1);
+    info("CAN board ready!\n")
 
     while(1)
         loop();
