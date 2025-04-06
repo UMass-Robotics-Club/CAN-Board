@@ -28,18 +28,23 @@ def gen_spark_packet(channel: int, id: int, degree: float):
 def gen_ak60_packet(channel: int, id: int, degree: float):
     return gen_can_header(channel, 4, AK60_POSITION_SETPOINT + id) + struct.pack(">i", degree * 10000)
 
+def test_controller(controller_num: int):
+    print(f"Testing controller {controller_num}")
+    conn.write(gen_can_header(controller_num, 0, 0))
+    print(b''.join(read_n_lines(conn, 4)).decode())
+
+def test_random():
+    test_controller(random.randint(0,0))
+    time.sleep(0.05)
+
+def test_input():
+    controller = int(input("Enter controller number: "))
+    if controller > 5:
+        print("Enter a number from 0-5!")
+        return
+    test_controller(controller)
+
 while(1):
-    # controller = int(input("Enter controller number: "))
-    # if controller > 5:
-    #     print("Enter a number from 0-5!")
-    #     continue
-
-    # controller = random.randint(0,5)
-    
-    # print(f"Testing controller {controller}")
-    # conn.write(gen_can_header(controller, 0, 0))
-    # print(b''.join(read_n_lines(conn, 4)).decode())
-
-    # conn.write(gen_packet(1, 1, position=3))
-    # print(b''.join(read_n_lines(conn, 8)).decode())
-    # time.sleep(0.01)
+    pass
+    # test_input()
+    # test_random()
