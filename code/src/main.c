@@ -34,10 +34,31 @@
 can_controller_t can_controllers[6];
 
 /**
+ * Handles IRQs by calling mcp25xxfd_irq_handler on the controller that triggered the interrupt.
+ */
+void TIME_CRITICAL can_irq_handler(void)
+{
+    for(uint8_t i = 0; i < 6; i++) {
+        uint8_t spi_irq = can_controllers[i].host_interface.spi_irq;
+        uint32_t events = gpio_get_irq_event_mask(spi_irq); 
+
+        if (events & GPIO_IRQ_LEVEL_LOW) {
+            mcp25xxfd_irq_handler(can_controllers + i);
+        }
+    }
+}
+
+
+/**
  * Binds the interfaces for the 6 CAN controllers and sets them up by calling can_setup_controller and adding an IRQ handler.
  */
 void setup_can_controllers(can_bitrate_t *bitrate) {
     debug("CAN setup: Starting setup...\n")
+
+    // add IRQ handler to call the IRQ handler on the correct CAN controller
+    irq_add_shared_handler(IO_IRQ_BANK0, can_irq_handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
+
+    debug("CAN setup: IRQ handler added!\n")
 
     for(uint8_t i = 0; i < 6; i++){
         debug("CAN setup: Controller %d: Staring setup...\n", i)
@@ -164,9 +185,11 @@ int main() {
     setup_can_controllers(&bitrate);
 
     // disable all interrupts
-    irq_set_enabled(IO_IRQ_BANK0, false);
+    // irq_set_enabled(IO_IRQ_BANK0, false);
 
     info("CAN board ready!\n")
+
+    getc(stdin);
 
     while(1)
         loop();

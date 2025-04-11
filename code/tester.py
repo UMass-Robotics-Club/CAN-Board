@@ -28,13 +28,19 @@ def gen_spark_packet(channel: int, id: int, degree: float):
 def gen_ak60_packet(channel: int, id: int, degree: float):
     return gen_can_header(channel, 4, AK60_POSITION_SETPOINT + id) + struct.pack(">i", degree * 10000)
 
+s = 0
+
 def test_controller(controller_num: int):
+    global s
     print(f"Testing controller {controller_num}")
     conn.write(gen_can_header(controller_num, 0, 0))
-    print(b''.join(read_n_lines(conn, 4)).decode())
+    output = b''.join(read_n_lines(conn, 4)).decode()
+    if not "ERROR" in output:
+        s += 1
+    print(output)
 
 def test_random():
-    test_controller(random.randint(0,0))
+    test_controller(random.randint(0,5))
     time.sleep(0.05)
 
 def test_input():
@@ -44,7 +50,12 @@ def test_input():
         return
     test_controller(controller)
 
+last_switch = 0
+TIMEOUT = 3
+dir = True
 while(1):
-    pass
-    # test_input()
-    # test_random()
+    print(f"Sending {"forward" if dir else "backwards"} packet")
+    conn.write(gen_spark_packet(0, 1, 360*(10 if dir else -10)))
+    if time.time() > last_switch + TIMEOUT:
+        last_switch = time.time()
+        dir = not dir
