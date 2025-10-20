@@ -104,31 +104,39 @@ void init_ext_spi() {
     debug("EXT SPI setup: Done setting up at baud %u!\n", baud)
 }
 
+/*
 typedef struct __attribute__((packed)) {
     uint8_t controller_num : 3;
     uint8_t data_len: 5; //should be larger to support max 64 bytes of CAN FD
 } can_command_header_t;
+*/
 
 void loop() {
-    // get header
-    can_command_header_t header;
-    spi_read_blocking(EXT_SPI, 0, (uint8_t*)&header, sizeof(header));
+    
+    uint8_t ext;
+    spi_read_blocking(EXT_SPI, 0, &ext, 1);
 
-    if(header.controller_num > 5){
-        error("Command header: Invalid CAN controller number: %d", header.controller_num)
-        return;
-    }
+    uint8_t channel;
+    spi_read_blocking(EXT_SPI, 0, &channel, 1);
 
-    // get arbitration (29 bit)
     uint32_t arbitration;
-    spi_read_blocking(EXT_SPI, 0, (uint8_t*)&arbitration, 4);
-    // get CAN frame data
-    uint8_t buffer[32];
-    spi_read_blocking(EXT_SPI, 0, buffer, header.data_len);
+    
+    if (ext == 0) //standard frame, 11-bit arbitration
+        spi_read_blocking(EXT_SPI, 0, (uint8_t*)&arbitration, 2); 
 
-    // Create a CAN frame
-    can_frame_t my_tx_frame;
-    can_make_frame(&my_tx_frame, true, arbitration, header.data_len, buffer, false);
+    //else extended 29-bit arbitration
+    else spi_read_blocking(EXT_SPI, 0, (uint8_t*) arbitration, 4); 
+
+    //can frame data
+    uint8_t buffer[32];
+    spi_read_blocking(EXT_SPI, 0, buffer, 32);
+
+    //Create can frame
+    can_frame_t tx_frame;
+
+    if (ext==0) can_make_frame(tx_frame, false, arbitration, 8, buffer, false);
+
+    else can_make_frame(tx_frame, true, arbitration, 8, buffer, false);
 
     while(1){
         can_errorcode_t rc = can_send_frame(can_controllers + header.controller_num, &my_tx_frame, false);
@@ -144,6 +152,7 @@ void loop() {
             break;
         }
     }
+    
 }
 
 void test_controller(int i){
