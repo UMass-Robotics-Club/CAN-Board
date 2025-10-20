@@ -120,9 +120,12 @@ void loop() {
     spi_read_blocking(EXT_SPI, 0, &channel, 1);
 
     uint32_t arbitration;
+    uint16_t dont_care;
     
     if (ext == 0) //standard frame, 11-bit arbitration
         spi_read_blocking(EXT_SPI, 0, (uint8_t*)&arbitration, 2); 
+        spi_read_blocking(EXT_SPI, 0, (uint8_t*)&dont_care, 2); //getting rid of empty bytes
+
 
     //else extended 29-bit arbitration
     else spi_read_blocking(EXT_SPI, 0, (uint8_t*) arbitration, 4); 
@@ -139,16 +142,16 @@ void loop() {
     else can_make_frame(tx_frame, true, arbitration, 8, buffer, false);
 
     while(1){
-        can_errorcode_t rc = can_send_frame(can_controllers + header.controller_num, &my_tx_frame, false);
+        can_errorcode_t rc = can_send_frame(can_controllers + channel, &tx_frame, false);
         if (rc != CAN_ERC_NO_ERROR) {
             // This can happen if there is no room in the transmit queue, which can
             // happen if the CAN controller is connected to a CAN bus but there are no
             // other CAN controllers connected and able to ACK a CAN frame, so the
             // transmit queue fills up and then cannot accept any more frames.
-            error("CAN send: Error on controller %d: %d,\n", header.controller_num, rc);
+            error("CAN send: Error on controller %d: %d,\n", channel, rc);
         }
         else {
-            debug("CAN send: Frame queued OK on controller %d\n", header.controller_num);
+            debug("CAN send: Frame queued OK on controller %d\n", channel);
             break;
         }
     }
