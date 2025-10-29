@@ -51,7 +51,7 @@ void setup_can_controllers(can_bitrate_t *bitrate) {
         if (i == 3)
             continue;
         
-        debug("CAN setup: Controller %d: Staring setup...\n", i);
+        debug("CAN setup: Controller %d: Starting setup...\n", i);
 
         // bind interface
         can_controllers[i].host_interface = (can_interface_t){
@@ -66,6 +66,12 @@ void setup_can_controllers(can_bitrate_t *bitrate) {
 
         // setup interrupt pin as input (don't know why but breaks without this)
         gpio_init(can_int_pins[i]);
+        gpio_set_dir(can_int_pins[i], GPIO_IN);
+
+        //recommended to prevent SPI hangs
+        gpio_init(can_spi_cs_pins[i]);
+        gpio_set_dir(can_spi_cs_pins[i], GPIO_OUT);
+        gpio_put(can_spi_cs_pins[i], 1);   // idle high
 
         // setup controller
         while (true) {
@@ -94,7 +100,7 @@ void init_ext_spi() {
     debug("EXT SPI setup: Starting setup...\n")
 
     uint baud = spi_init(EXT_SPI, EXT_SPI_BAUD);
-    spi_set_slave(EXT_SPI, true);
+    spi_set_slave(EXT_SPI, true); //set to slave 
 
     gpio_set_function(EXT_SPI_SCK, GPIO_FUNC_SPI);
     gpio_set_function(EXT_SPI_TX, GPIO_FUNC_SPI);
@@ -122,26 +128,27 @@ void loop() {
     uint32_t arbitration;
     uint16_t dont_care;
     
-    if (ext == 0) //standard frame, 11-bit arbitration
+    if (ext == 0){ //standard frame, 11-bit arbitration
         spi_read_blocking(EXT_SPI, 0, (uint8_t*)&arbitration, 2); 
         spi_read_blocking(EXT_SPI, 0, (uint8_t*)&dont_care, 2); //getting rid of empty bytes
-
+    }
 
     //else extended 29-bit arbitration
-    else spi_read_blocking(EXT_SPI, 0, (uint8_t*) arbitration, 4); 
+    else spi_read_blocking(EXT_SPI, 0, (uint8_t*)&arbitration, 4); 
 
     //can frame data
     uint8_t buffer[32];
-    spi_read_blocking(EXT_SPI, 0, buffer, 32);
+    spi_read_blocking(EXT_SPI, 0, buffer, 8); //read 8 bits (data)
 
     //Create can frame
     can_frame_t tx_frame;
 
-    if (ext==0) can_make_frame(tx_frame, false, arbitration, 8, buffer, false);
+    if (ext==0) can_make_frame(&tx_frame, false, (uint16_t)arbitration, 8, buffer, false);
 
-    else can_make_frame(tx_frame, true, arbitration, 8, buffer, false);
+    else can_make_frame(&tx_frame, true, arbitration, 8, buffer, false);
 
     while(1){
+        
         can_errorcode_t rc = can_send_frame(can_controllers + channel, &tx_frame, false);
         if (rc != CAN_ERC_NO_ERROR) {
             // This can happen if there is no room in the transmit queue, which can
@@ -154,6 +161,7 @@ void loop() {
             debug("CAN send: Frame queued OK on controller %d\n", channel);
             break;
         }
+        sleep(1000); //delay for 1s
     }
     
 }
@@ -164,6 +172,7 @@ void test_controller(int i){
     can_make_frame(&my_tx_frame, false, 0xaa, 12, "hello world!", false);
 
     while(1){
+        
         can_errorcode_t rc = can_send_frame(can_controllers + i, &my_tx_frame, false);
         if (rc != CAN_ERC_NO_ERROR) {
             // This can happen if there is no room in the transmit queue, which can
