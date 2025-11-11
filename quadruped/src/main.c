@@ -119,36 +119,49 @@ typedef struct __attribute__((packed)) {
 
 void loop() {
     
-    uint8_t ext;
-    spi_read_blocking(EXT_SPI, 0, &ext, 1);
+    /*
+    Format from rs02.c motor driver
 
-    uint8_t channel;
-    spi_read_blocking(EXT_SPI, 0, &channel, 1);
-
-    uint32_t arbitration;
-    uint16_t dont_care;
+    Standard Format: [ext: 1 byte | channel: 1 byte | 2 don't care bytes | id: 2 bytes | data: 8 bytes] = 14 bytes
+    Extended Format: [ext: 1 byte | channel: 1 byte | id: 4 bytes | data: 8 bytes] = 14 bytes */
     
-    if (ext == 0){ //standard frame, 11-bit arbitration
-        spi_read_blocking(EXT_SPI, 0, (uint8_t*)&arbitration, 2); 
-        spi_read_blocking(EXT_SPI, 0, (uint8_t*)&dont_care, 2); //getting rid of empty bytes
+    uint8_t spi_rx_frame[14];
+    spi_read_blocking(EXT_SPI, 0, spi_rx_frame, 14);
+
+
+    uint8_t ext = spi_rx_frame[0];
+    uint8_t channel = spi_rx_frame[1];
+    uint32_t arbitration;
+
+
+    if (ext == 0)//standard frame, 11-bit arbitration
+        arbitration = (spi_rx_frame[4] << 8) || spi_rx_frame[5];
+    
+    else { //extended 29-bit arbitration
+        arbitration = (spi_rx_frame[2] << 32);
+        arbitration |= (spi_rx_frame[3] << 24);
+        arbitration |= (spi_rx_frame[4] << 16);
+        arbitration |= spi_rx_frame[5];
     }
 
-    //else extended 29-bit arbitration
-    else spi_read_blocking(EXT_SPI, 0, (uint8_t*)&arbitration, 4); 
+    //data
+    uint8_t buffer[8];
 
-    //can frame data
-    uint8_t buffer[32];
-    spi_read_blocking(EXT_SPI, 0, buffer, 8); //read 8 bits (data)
+    for (int j = 0; j < 8; j++){
+        buffer[j] = spi_rx_frame[j+8]; 
+    }
+
 
     //Create can frame
     can_frame_t tx_frame;
+
 
     if (ext==0) can_make_frame(&tx_frame, false, (uint16_t)arbitration, 8, buffer, false);
 
     else can_make_frame(&tx_frame, true, arbitration, 8, buffer, false);
 
     while(1){
-        
+
         can_errorcode_t rc = can_send_frame(can_controllers + channel, &tx_frame, false);
         if (rc != CAN_ERC_NO_ERROR) {
             // This can happen if there is no room in the transmit queue, which can
@@ -162,7 +175,22 @@ void loop() {
             break;
         }
         sleep(1000); //delay for 1s
+
+        can_rx_event_t rx_event;
+        uint32_t n = 0;
+
+        //print received frame - CHANGE TO SEND OVER SPI TO JETSON
+        can_rx_event_t *e = &rx_event;
+
+        if (can_recv(&controller, e) && can_event_is_frame(e)) {
+            can_frame_t rx_frame = can_event_get_frame(e);
+            print_frame(rx_frame, e->timestamp);
+            n++;
+        }
+        
+        spi_write_blocking() //write can frame through spi to jetson for debugging
     }
+    
     
 }
 
