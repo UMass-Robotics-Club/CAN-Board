@@ -23,37 +23,39 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pico2 CACHE STRING "Board type")
+set(PICO_BOARD pico CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
 
-project(canboard25 C CXX ASM)
+project(quadruped_spi C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
-
 file(GLOB cSources ./src/*.c)
-add_executable(canboard25 ${cSources})
+add_executable(quadruped_spi ${cSources})
 
-pico_set_program_name(canboard25 "canboard25")
-pico_set_program_version(canboard25 "0.1")
+pico_set_program_name(quadruped_spi "quadruped_spi")
+pico_set_program_version(quadruped_spi "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(canboard25 0)
-pico_enable_stdio_usb(canboard25 0)
+pico_enable_stdio_uart(quadruped_spi 0)
+pico_enable_stdio_usb(quadruped_spi 1)
 
 # Add the standard library to the build
-target_link_libraries(canboard25 pico_stdlib hardware_spi hardware_gpio)
+target_link_libraries(quadruped_spi
+        pico_stdlib 
+        hardware_spi
+        hardware_gpio)
 
 # Add the standard include files to the build
-target_include_directories(canboard25 PRIVATE
+target_include_directories(quadruped_spi PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
 )
 
-target_include_directories(canboard25 PUBLIC ./include)
+target_include_directories(quadruped_spi PUBLIC ./include)
 
-pico_add_extra_outputs(canboard25)
+pico_add_extra_outputs(quadruped_spi)
 

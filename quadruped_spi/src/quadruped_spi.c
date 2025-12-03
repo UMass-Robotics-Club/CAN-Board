@@ -1,4 +1,5 @@
 #include "pico/stdlib.h"
+#include <stdio.h>
 #include "pins.h"
 #include "canapi.h"
 
@@ -118,29 +119,32 @@ typedef struct __attribute__((packed)) {
 */
 
 void loop() {
-    
+
     /*
     Format from rs02.c motor driver
 
     Standard Format: [ext: 1 byte | channel: 1 byte | 2 don't care bytes | id: 2 bytes | data: 8 bytes] = 14 bytes
     Extended Format: [ext: 1 byte | channel: 1 byte | id: 4 bytes | data: 8 bytes] = 14 bytes */
     
+    printf("Waiting for write from spi master");
     uint8_t spi_rx_frame[14];
+    uint8_t spi_tx_frame[14];
+
     spi_read_blocking(EXT_SPI, 0, spi_rx_frame, 14);
-
-
+    
     uint8_t ext = spi_rx_frame[0];
     uint8_t channel = spi_rx_frame[1];
     uint32_t arbitration;
 
+    printf("Setting up CAN transfer");
 
     if (ext == 0)//standard frame, 11-bit arbitration
-        arbitration = (spi_rx_frame[4] << 8) || spi_rx_frame[5];
+        arbitration = (spi_rx_frame[4] << 8) | spi_rx_frame[5];
     
     else { //extended 29-bit arbitration
-        arbitration = (spi_rx_frame[2] << 32);
-        arbitration |= (spi_rx_frame[3] << 24);
-        arbitration |= (spi_rx_frame[4] << 16);
+        arbitration = (spi_rx_frame[2] << 24);
+        arbitration |= (spi_rx_frame[3] << 16);
+        arbitration |= (spi_rx_frame[4] << 8);
         arbitration |= spi_rx_frame[5];
     }
 
@@ -148,21 +152,20 @@ void loop() {
     uint8_t buffer[8];
 
     for (int j = 0; j < 8; j++){
-        buffer[j] = spi_rx_frame[j+8]; 
+        buffer[j] = spi_rx_frame[j+6]; 
     }
 
 
     //Create can frame
     can_frame_t tx_frame;
 
-
     if (ext==0) can_make_frame(&tx_frame, false, (uint16_t)arbitration, 8, buffer, false);
 
     else can_make_frame(&tx_frame, true, arbitration, 8, buffer, false);
 
     while(1){
-
-        can_errorcode_t rc = can_send_frame(can_controllers + channel, &tx_frame, false);
+        
+        can_errorcode_t rc = can_send_frame(can_controllers+channel, &tx_frame, false);
         if (rc != CAN_ERC_NO_ERROR) {
             // This can happen if there is no room in the transmit queue, which can
             // happen if the CAN controller is connected to a CAN bus but there are no
@@ -174,25 +177,14 @@ void loop() {
             debug("CAN send: Frame queued OK on controller %d\n", channel);
             break;
         }
-        sleep(1000); //delay for 1s
-
-        can_rx_event_t rx_event;
-        uint32_t n = 0;
-
-        //print received frame - CHANGE TO SEND OVER SPI TO JETSON
-        can_rx_event_t *e = &rx_event;
-
-        if (can_recv(&controller, e) && can_event_is_frame(e)) {
-            can_frame_t rx_frame = can_event_get_frame(e);
-            print_frame(rx_frame, e->timestamp);
-            n++;
-        }
-        
-        spi_write_blocking() //write can frame through spi to jetson for debugging
+        sleep_ms(1000);
     }
-    
+
+    printf("%d\n", spi_rx_frame[0]);
+    spi_write_blocking(EXT_SPI, spi_rx_frame, 14);
     
 }
+
 
 void test_controller(int i){
     // Create a CAN frame
@@ -218,23 +210,24 @@ void test_controller(int i){
 
 int main() {
     stdio_init_all();
-
+    
     // while(!stdio_usb_connected()){}
 
-    gpio_init(EXT_GPIO_15);
-    gpio_set_dir(EXT_GPIO_15, 1);
-    gpio_put(EXT_GPIO_15, 0);
-
-    info("Starting setup...")
-
+    info("Starting setup...\n")
+  
     init_ext_spi();
+
     can_bitrate_t bitrate = {.profile=CAN_BITRATE};
     setup_can_controllers(&bitrate);
 
     info("CAN board ready!\n")
 
-    test_controller(1);
+    //test_controller(1);
 
-    while(1)
+    while(1){
+        sleep_ms(10000);
+        printf("looped\n");
         loop();
+    }
+    return 0;
 }
