@@ -7,7 +7,8 @@
 #define ENABLE_DEBUG
 #define ENABLE_INFO
 #define ENABLE_WARNING
-#define ENABLE_ERROR
+#define FRAME_SIZE
+
 
 #include "logging.h"
 
@@ -127,10 +128,10 @@ void loop() {
     Extended Format: [ext: 1 byte | channel: 1 byte | id: 4 bytes | data: 8 bytes] = 14 bytes */
     
     printf("Waiting for write from spi master");
-    uint8_t spi_rx_frame[14];
-    uint8_t spi_tx_frame[14];
+    uint8_t spi_rx_frame[FRAME_SIZE];
+    uint8_t spi_tx_frame[FRAME_SIZE];
 
-    spi_read_blocking(EXT_SPI, 0, spi_rx_frame, 14);
+    spi_read_blocking(EXT_SPI, 0, spi_rx_frame, FRAME_SIZE;
     
     uint8_t ext = spi_rx_frame[0];
     uint8_t channel = spi_rx_frame[1];
@@ -180,8 +181,6 @@ void loop() {
         sleep_ms(1000);
     }
 
-    printf("%d\n", spi_rx_frame[0]);
-    spi_write_blocking(EXT_SPI, spi_rx_frame, 14);
     
 }
 
