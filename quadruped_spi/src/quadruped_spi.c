@@ -7,7 +7,7 @@
 #define ENABLE_DEBUG
 #define ENABLE_INFO
 #define ENABLE_WARNING
-#define FRAME_SIZE
+#define FRAME_SIZE 14
 
 
 #include "logging.h"
@@ -127,17 +127,24 @@ void loop() {
     Standard Format: [ext: 1 byte | channel: 1 byte | 2 don't care bytes | id: 2 bytes | data: 8 bytes] = 14 bytes
     Extended Format: [ext: 1 byte | channel: 1 byte | id: 4 bytes | data: 8 bytes] = 14 bytes */
     
-    printf("Waiting for write from spi master");
+    printf("Waiting for write from spi master\n");
     uint8_t spi_rx_frame[FRAME_SIZE];
-    uint8_t spi_tx_frame[FRAME_SIZE];
 
-    spi_read_blocking(EXT_SPI, 0, spi_rx_frame, FRAME_SIZE;
+    spi_read_blocking(EXT_SPI, 2, spi_rx_frame, FRAME_SIZE);
+
+    printf("Read from spi\n");
+    
+    for (int k=0; k<FRAME_SIZE; k++){
+        printf("%02X\n", spi_rx_frame[k]);
+    }
+
+    printf("End of Frame\n");
     
     uint8_t ext = spi_rx_frame[0];
     uint8_t channel = spi_rx_frame[1];
     uint32_t arbitration;
 
-    printf("Setting up CAN transfer");
+    printf("Setting up CAN frame\n");
 
     if (ext == 0)//standard frame, 11-bit arbitration
         arbitration = (spi_rx_frame[4] << 8) | spi_rx_frame[5];
@@ -180,7 +187,6 @@ void loop() {
         }
         sleep_ms(1000);
     }
-
     
 }
 
@@ -224,8 +230,6 @@ int main() {
     //test_controller(1);
 
     while(1){
-        sleep_ms(10000);
-        printf("looped\n");
         loop();
     }
     return 0;
