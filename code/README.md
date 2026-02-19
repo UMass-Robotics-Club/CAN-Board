@@ -58,16 +58,30 @@ gdb ./build/can_board.elf -ex 'set arch arm' -ex 'target extended-remote :3333'
 ## Overall Architecture
 
 ### Core 1
-Handles getting input and puts CAN frames into lists 
+Handles getting input 
 
 ### Core 2
-- Loop:
-    - 
+Handles the CAN controllers
 
 
 Send
 - Command (1 byte):
-    - Get status
+    - Get board operation status
+        - Ready
+        - SPI busy
+        - Error
+            - Will send back error code
+    - Get timestamp
+    - Get operation status of CAN controllers
+        - Uninitialized
+        - Initializing
+        - Standby
+        - Busy
+        - Error
+            - Will send back error code
+    - Initialize CAN controllers
+
+
     - Write CAN frames
     - Query any CAN packets available
     - Read CAN frames
@@ -76,6 +90,9 @@ Send
  
 Recv
 - Return Code
+    - 0x00: Okay
+    - 0x01: Unknown command
+    - 0x02: Timeout
 - Data Size
 - Data
 
@@ -84,5 +101,6 @@ Recv
     - Priority (5 bits)
     - Controller (3 bits)
     - Extended Frame (1 bit)
-    - Data Size (7 bits)
+    - 
+    - Data Size (1 byte)
     - Data (N bytes)

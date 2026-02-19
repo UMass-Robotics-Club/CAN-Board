@@ -265,7 +265,7 @@ static uint8_t can_status_get_rec(can_status_t status);
 
 /// @brief Structure holding the details of a CAN frame
 typedef struct  {
-    can_uref_t uref;    // User-defined data for callbacks to use
+    can_uref_t uref;    //  User-defined data for callbacksto use
     can_id_t canid;     // CAN ID
     uint32_t data[2];   // Payload stored as two words (but in memory treated as bytes)
     uint8_t dlc;        // DLC (0-15)
