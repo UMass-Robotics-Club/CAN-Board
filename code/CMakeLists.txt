@@ -38,7 +38,7 @@ add_executable(${PROJECT_NAME} ${cSources})
 target_include_directories(${PROJECT_NAME} PUBLIC ./include)
 
 # add pico_stdlib library which aggregates commonly used features
-target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_spi hardware_gpio)
+target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_spi hardware_gpio pico_multicore)
 
 # create map/bin/hex/uf2 file in addition to ELF.
 pico_add_extra_outputs(${PROJECT_NAME})

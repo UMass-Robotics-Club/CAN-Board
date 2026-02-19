@@ -51,3 +51,38 @@ sudo openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -c "adapter speed 5
 ```
 gdb ./build/can_board.elf -ex 'set arch arm' -ex 'target extended-remote :3333'
 ```
+
+
+# Better Communication Protocol
+
+## Overall Architecture
+
+### Core 1
+Handles getting input and puts CAN frames into lists 
+
+### Core 2
+- Loop:
+    - 
+
+
+Send
+- Command (1 byte):
+    - Get status
+    - Write CAN frames
+    - Query any CAN packets available
+    - Read CAN frames
+- Data Size (1 byte)
+- 
+ 
+Recv
+- Return Code
+- Data Size
+- Data
+
+
+- CAN packet structure
+    - Priority (5 bits)
+    - Controller (3 bits)
+    - Extended Frame (1 bit)
+    - Data Size (7 bits)
+    - Data (N bytes)
