@@ -75,6 +75,7 @@
 // Brings in API, chip-specific and board-specific definitions
 #include "canapi.h"
 
+
 // FIXME get rid of this after debugging done
 typedef void (*mp_print_strn_t)(void *data, const char *str, size_t len);
 typedef struct _mp_print_t {
@@ -364,8 +365,6 @@ uint32_t WEAK TIME_CRITICAL can_isr_callback_uref(can_uref_t uref)
 #define             TRIS1           (1U << 1)
 #define             TRIS0           (1U << 0)
 #define             XSTBYEN         (1U << 6)
-#define             LAT0            (1U << 8)
-#define             LAT1            (1U << 9)
 #define         CRC             (0xe08U)
 #define         ECCCON          (0xe0cU)
 #define         ECCSTAT         (0xe10U)
@@ -470,34 +469,49 @@ static void TIME_CRITICAL hard_reset(can_interface_t *spi_interface)
     mcp25xxfd_spi_deselect(spi_interface);
 }
 
-// The MCP251xFD has options for driving its transceiver TX pin in open drain mode.
-// It also has two pins that could be used as GPIO.
-static void TIME_CRITICAL set_controller_pins(can_interface_t *spi_interface, bool tx_open_drain)
+/**
+ * TODO user modified
+ * This will configure the external crystal, set the IOCON register, and optionally verify it was set correctly. 
+ * 
+ * INTOD=1 to set interrup pins as open drian else they will be push pull
+ * SOF=1 to select SOF on CLKO
+ * TXCANOD=1 to use TXCAN pin as open drain output else it is push pull
+ * PM1=1 to use pin as GPIO1 else it is used for RX interrupt
+ * PM0=1 to use pin as GPIO0 else it is used for TX interrupt 
+ * XSTBYEN=1 to enable transciever standby control on GPIO0
+ * TRIS1=1 to select GPIO1 as an input else its an output
+ * TRIS0=1 to select GPIO0 as an input else its an output
+ */
+// The 
+static can_errorcode_t TIME_CRITICAL set_controller_pins(can_interface_t *spi_interface, uint32_t iocon_value, bool verify)
 {
     // Must be called with interrupts locked
 
     // Set SYSCLK to the external crystal (40MHz on the CANPico) and don't use the PLL
     write_word(spi_interface, OSC, 0);
-    // Set up IOCON by setting:
-    //
-    // SOF=1 to select SOF on CLKO
-    // TXCANOD=1 to select open collector transmit pin
-    // PM1=1 to use pin as GPIO1
-    // PM0=1 to use pin as GPIO0
-    // TRIS1=1 to select GPIO1 as an input
-    // TRIS0=1 to select GPIO0 as an input
-    uint32_t word = SOF | PM1 | PM0 | TRIS1 | TRIS0;
-    if (tx_open_drain) {
-        word |= TXCANOD;
-    }
+
     // Due to a silicon bug, IOCON must be written byte-by-byte
     // MCP251xFD is little-endian (least-signficant bits of a word are in low
     // memory address - see Figure 3-1 of datasheet). Compiler will spot these
     // shifts and turn them into byte accesses.
-    write_byte(spi_interface, IOCON + 0U, (word >> 0) & 0xffU);
-    write_byte(spi_interface, IOCON + 1U, (word >> 8) & 0xffU);
-    write_byte(spi_interface, IOCON + 2U, (word >> 16) & 0xffU);
-    write_byte(spi_interface, IOCON + 3U, (word >> 24) & 0xffU);
+    write_byte(spi_interface, IOCON + 0U, (iocon_value >> 0) & 0xffU);
+    write_byte(spi_interface, IOCON + 1U, (iocon_value >> 8) & 0xffU);
+    write_byte(spi_interface, IOCON + 2U, (iocon_value >> 16) & 0xffU);
+    write_byte(spi_interface, IOCON + 3U, (iocon_value >> 24) & 0xffU);
+
+    // Verify if requested with CRC read
+    if (!verify)
+        return CAN_ERC_NO_ERROR;
+
+    // Check that IOCON was set correctly
+    uint32_t iocon = read_word_crc(spi_interface, IOCON);
+    // All of the IOCON paramaters that need to be checked
+    uint32_t config_mask = TRIS0 | TRIS1 | XSTBYEN | PM0 | PM1 | TXCANOD | SOF | INTOD;
+    if ((iocon & config_mask) != (iocon_value & config_mask)) {
+        return CAN_ERC_BAD_WRITE;
+    }
+
+    return CAN_ERC_NO_ERROR;
 }
 
 // This is called after the mode change to normal has occurred so that there won't be a interrupt
@@ -637,7 +651,6 @@ static bool TIME_CRITICAL send_frame(can_controller_t *controller, const can_fra
     if (!fifo || controller->tx_pri_queue.fifo_slot == CAN_TX_QUEUE_SIZE) {
         // Put the frame in the priority transmit queue
         if (controller->tx_pri_queue.num_free_slots == 0) {
-            // No room in the transmit queue
             return false;
         }
         else {
@@ -1341,18 +1354,16 @@ can_errorcode_t TIME_CRITICAL can_setup_controller(can_controller_t *controller,
         hard_reset(spi_interface);
     }
 
+    // TODO modified
     // Set controller's clock and I/O pins (and set TX pin to open drain if requested)
-    set_controller_pins(spi_interface, options & CAN_OPTION_OPEN_DRAIN);
+    // set_controller_pins(spi_interface, options & CAN_OPTION_OPEN_DRAIN);
 
-    // Check that IOCON was set correctly for TX open drain and return an error if it
-    // is not set.
-    uint32_t iocon = read_word_crc(spi_interface, IOCON);
-    if ((options & CAN_OPTION_OPEN_DRAIN) && !(iocon & TXCANOD)) {
-        return CAN_ERC_BAD_WRITE;
+    // Set controller's clock and I/O pins to enable auto standby
+    // To enable auto standby we need XSTBYEN=1, PM0=1, and TRIS0=0
+    can_errorcode_t rc = set_controller_pins(spi_interface, XSTBYEN | PM0 & ~TRIS0, true);
+    if (rc != CAN_ERC_NO_ERROR){
+        return rc;
     }
-
-    // enable standby
-    write_word(spi_interface, IOCON, (iocon & ~TRIS0) | PM0 | XSTBYEN);
 
     // Set the bit rate values according to the profile, default to 500K if an unknown profile
     switch (bitrate->profile) {
@@ -1577,6 +1588,16 @@ uint32_t TIME_CRITICAL can_recv_as_bytes(can_controller_t *controller, uint8_t *
     return result;
 }
 
+uint32_t TIME_CRITICAL can_recv_as_bytes_safe(can_controller_t *controller, uint8_t *dest)
+{
+    if(controller->rx_fifo.free < CAN_RX_FIFO_SIZE) {
+        pop_rx_event_as_bytes(controller, dest);
+        return NUM_RX_EVENT_BYTES;
+    }
+    
+    return 0;
+}
+
 // Receives one event from the receive FIFO (events can be CAN frames, CAN errors, FIFO overflow)
 bool TIME_CRITICAL can_recv(can_controller_t *controller, can_rx_event_t *event)
 {
@@ -1599,6 +1620,18 @@ bool TIME_CRITICAL can_recv(can_controller_t *controller, can_rx_event_t *event)
     mcp25xxfd_spi_gpio_enable_irq(spi_interface);
 
     return result;
+}
+
+// Receives one event from the receive FIFO (events can be CAN frames, CAN errors, FIFO overflow)
+// This method assumes the IRQs are already disabled
+bool TIME_CRITICAL can_recv_safe(can_controller_t *controller, can_rx_event_t *event)
+{
+    if(controller->rx_fifo.free < CAN_RX_FIFO_SIZE) {
+        pop_rx_event(controller, event);
+        return true;
+    }
+    
+    return false;
 }
 
 // Return number of events waiting in the RX FIFO.`
@@ -1639,6 +1672,16 @@ bool TIME_CRITICAL can_recv_tx_event(can_controller_t *controller, can_tx_event_
     return result;
 }
 
+bool TIME_CRITICAL can_recv_tx_event_safe(can_controller_t *controller, can_tx_event_t *event)
+{     
+    if(controller->tx_event_fifo.free < CAN_TX_EVENT_FIFO_SIZE) {
+        pop_tx_event(controller, event);
+        return true;
+    }
+    
+    return false;
+}
+
 uint32_t TIME_CRITICAL can_recv_tx_event_as_bytes(can_controller_t *controller, uint8_t *dest, size_t n_bytes)
 {
     if (controller == NULL) {
@@ -1662,6 +1705,15 @@ uint32_t TIME_CRITICAL can_recv_tx_event_as_bytes(can_controller_t *controller, 
     mcp25xxfd_spi_gpio_enable_irq(spi_interface);
     // Return the number of bytes actually received
     return recvd;
+}
+
+uint32_t TIME_CRITICAL can_recv_tx_event_as_bytes_safe(can_controller_t *controller, uint8_t *dest)
+{
+    if(controller->tx_event_fifo.free < CAN_TX_EVENT_FIFO_SIZE) {
+        return pop_tx_event_as_bytes(controller, dest, NUM_TX_EVENT_BYTES);
+    }
+    
+    return 0;
 }
 
 // Return number of events waiting in the TX event FIFO

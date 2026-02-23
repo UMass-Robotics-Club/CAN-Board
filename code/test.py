@@ -1,0 +1,229 @@
+import serial
+import struct
+import enum
+
+com = serial.Serial("/dev/ttyACM1", 115200)
+
+
+class HostCommand(enum.IntEnum):
+    SEND_FRAME = 0x00
+    RECV_RX_EVENTS = 0x01
+    RECV_TX_EVENTS = 0x02
+    RECV_CAN_INFO = 0x03
+
+
+class CommandResponse(enum.IntEnum):
+    CMD_RESPONSE_OK = 0x00
+    CMD_RESPONSE_BAD_PKT = 0x01
+    CMD_RESPONSE_CMD_UNKNOWN = 0x02
+    CMD_RESPONSE_CMD_MALFORMED = 0x03
+    CMD_RESPONSE_TIMEOUT = 0x04
+    CMD_RESPONSE_FAILED = 0x05
+    CMD_RESPONSE_NO_RESOURCES = 0x06
+
+
+class FrameOption(enum.IntFlag):
+    NONE = 0
+    EXTENDED = (1 << 0) # Use CAN extended 29 bit arbitration
+    REMOTE = (1 << 1)   # This is a CAN remote frame
+    USE_FIFO = (1 << 2) # Use TX FIFO instead of directly going into TX priority queue
+    USE_UREF = (1 << 3) # Add a user reference to the frame (else it will default to 0)
+
+
+class CANErrorCode(enum.IntEnum):
+    CAN_ERC_NO_ERROR = 0,                               # OK
+    CAN_ERC_BAD_BITRATE=1,                                # Baud rate settings are not legal
+    CAN_ERC_RANGE=2,                                      # Range error on parameters
+    CAN_ERC_BAD_INIT=3,                                   # Can't get the controller to initialize
+    CAN_ERC_NO_ROOM=4,                                    # No room
+    CAN_ERC_NO_ROOM_PRIORITY=5,                           # No room in the transmit priority queue
+    CAN_ERC_NO_ROOM_FIFO=6,                               # No room in the transmit FIFO queue
+    CAN_ERC_BAD_WRITE=7,                                  # Write to a controller register failed
+    CAN_ERC_NO_INTERFACE=8,                               # No interface binding set for the controller
+
+
+class EventType(enum.IntEnum):
+    CAN_EVENT_TYPE_TRANSMITTED_FRAME = 0,       # Frame transmitted
+    CAN_EVENT_TYPE_RECEIVED_FRAME = 1,          # Frame received
+    CAN_EVENT_TYPE_OVERFLOW = 2,                # FIFO overflow happened
+    CAN_EVENT_TYPE_CAN_ERROR = 3                # CAN error frame received
+
+
+class CANTXEvent:
+    def __init__(self, data: bytes):
+        assert len(data) == 9, "TX event data must be 9 bytes"
+        self.data = data
+        self.type = EventType(data[0])
+        self.timestamp : int = struct.unpack_from(">I", data, 5)[0]
+        tmp = struct.unpack_from(">I", data, 1)[0]
+        self.user_ref : int | None = tmp if self.type == EventType.CAN_EVENT_TYPE_TRANSMITTED_FRAME else None
+        self.overflow_count : int | None = tmp if self.type == EventType.CAN_EVENT_TYPE_OVERFLOW else None
+
+    def __str__(self):
+        if self.type == EventType.CAN_EVENT_TYPE_TRANSMITTED_FRAME:
+            return f"TX Event: Transmitted frame (user_ref={hex(self.user_ref)}, timestamp={self.timestamp})"
+        elif self.type == EventType.CAN_EVENT_TYPE_OVERFLOW:
+            return f"TX Event: Overflow frame (count={self.overflow_count}, timestamp={self.timestamp})"
+
+    def __repr__(self):
+        return "CANTXEvent(type={}, user_ref={}, overflow_count={}, timestamp={})".format(
+            self.type, hex(self.user_ref) if self.user_ref is not None else None,
+            self.overflow_count, self.timestamp)
+
+class CANRXFrameData:
+    def __init__(self, data: bytes):
+        self.remote: bool = bool(data[0] & 0x80)
+        self.dlc: int = data[5]
+        self.id_filter: int = data[6] # This specifies which ID filter matched the frame
+        self.arbitration_id: int = struct.unpack_from(">I", data, 7)[0]
+        self.data: bytes = data[11:11+self.dlc]
+
+    def __str__(self):
+        return f"RX Event: Received frame (arbitration_id={hex(self.arbitration_id)}, dlc={self.dlc}, data={self.data.hex()}, id_filter={self.id_filter}, remote={self.remote})"
+
+    def __repr__(self):
+        return "CANRXFrameData(arbitration_id={}, dlc={}, data={}, id_filter={}, remote={})".format(
+            hex(self.arbitration_id), self.dlc, self.data.hex(), self.id_filter, self.remote)
+
+class CANRXErrorData:
+    def __init__(self, data: bytes):
+        self.details: int = struct.unpack_from(">I", data, 7)[0]
+
+    def __str__(self):
+        return f"RX Event: CAN error frame (details={hex(self.details)})"
+    
+    def __repr__(self):
+        return "CANRXErrorData(details={})".format(hex(self.details))
+
+class CANRXOverflowData:
+    def __init__(self, data: bytes):
+        self.frame_count, self.error_count = struct.unpack_from(">II", data, 7)
+
+    def __str__(self):
+        return f"RX Event: Overflow frame (frame_count={self.frame_count}, error_count={self.error_count})"
+
+    def __repr__(self):
+        return f"CANRXOverflowData(frame_count={self.frame_count}, error_count={self.error_count})"
+
+class CANRXEvent:
+    def __init__(self, data: bytes):
+        assert len(data) == 19, "RX event data must be 19 bytes"
+        self.data = data
+        self.type = EventType(data[0])
+        self.timestamp : int = struct.unpack_from(">I", data, 1)[0]
+        self.frame : CANRXFrameData | None = CANRXFrameData(data) if self.type == EventType.CAN_EVENT_TYPE_RECEIVED_FRAME else None
+        self.error : CANRXErrorData | None = CANRXErrorData(data) if self.type == EventType.CAN_EVENT_TYPE_CAN_ERROR else None
+        self.overflow : CANRXOverflowData | None = CANRXOverflowData(data) if self.type == EventType.CAN_EVENT_TYPE_OVERFLOW else None
+
+    def __str__(self):
+        if self.type == EventType.CAN_EVENT_TYPE_RECEIVED_FRAME:
+            return str(self.frame)
+        elif self.type == EventType.CAN_EVENT_TYPE_CAN_ERROR:
+            return str(self.error)
+        elif self.type == EventType.CAN_EVENT_TYPE_OVERFLOW:
+            return str(self.overflow)
+        else:
+            return f"Unknown RX event type {self.type} with timestamp {self.timestamp}"
+        
+    def __repr__(self):
+        return "CANRXEvent(type={}, timestamp={}, frame={}, error={}, overflow={})".format(
+            self.type, self.timestamp, repr(self.frame), repr(self.error), repr(self.overflow))
+
+def make_transaction(command: int, payload: bytes) -> tuple[int, bytes]:
+    # Send packet
+    send_bytes = b"\xAA" + struct.pack("<BH", command, len(payload)) + payload + b"\x55"
+    com.write(send_bytes)
+
+    # Wait for response
+    # TODO add timeout and error handling
+    # Parse until 0xAA is found (print any messages)
+    non_cmd_data = bytearray()
+    while True:
+        byte = com.read(1)
+        if byte == b"\xAA":
+            break
+        non_cmd_data.extend(byte)
+    
+    # print any non-command data received (e.g. debug messages)
+    if non_cmd_data:
+        print("Received non-command data from device:")
+        for line in non_cmd_data.split(b"\n"):
+            if not line.strip():
+                continue
+            print(f"> {line.decode()}")
+
+    
+    ret_code, length = struct.unpack("<BH", com.read(3))
+    payload = com.read(length) if length else b"" # Read the payload
+    end = com.read(1)
+
+    assert end == b"\x55", f"Expected frame end byte 0x55, but got {end}"
+
+    return ret_code, payload
+
+def send_can_frame(controller: int, arbitration_id: int, frame_data: bytes, options: FrameOption = FrameOption.NONE, user_ref: int = 0):
+    assert 0 <= controller < 6, "Controller number must be between 0 and 5"
+    assert len(frame_data) <= 8, "Frame data must be at most 8 bytes"
+
+    payload = struct.pack("<BBB", controller, options, len(frame_data)) + struct.pack("<I" if options & FrameOption.EXTENDED else "<H", arbitration_id)
+    if options & FrameOption.USE_UREF:
+        payload += struct.pack("<I", user_ref)
+    payload += frame_data
+
+    ret_code, ret_data = make_transaction(HostCommand.SEND_FRAME, payload)
+    
+    if ret_code != CommandResponse.CMD_RESPONSE_OK:
+        raise Exception(f"Failed to send CAN frame: {CommandResponse(ret_code).name} with data {ret_data.hex()}")
+
+def get_can_rx_events(controller: int) -> list[CANRXEvent]:
+    assert 0 <= controller < 6, "Controller number must be between 0 and 5"
+
+    payload = struct.pack("<B", controller)
+    ret_code, ret_data = make_transaction(HostCommand.RECV_RX_EVENTS, payload)
+    
+    if ret_code != CommandResponse.CMD_RESPONSE_OK:
+        raise Exception(f"Failed to get RX events: {CommandResponse(ret_code).name}")
+    
+    events = []
+    for i in range(0, len(ret_data), 19):
+        event_data = ret_data[i:i+19]
+        if len(event_data) < 19:
+            print(f"Warning: Incomplete RX event data received (expected 19 bytes, got {len(event_data)}), skipping")
+            continue
+        events.append(CANRXEvent(event_data))
+
+    return events
+
+def get_can_tx_events(controller: int) -> list[CANTXEvent]:
+    assert 0 <= controller < 6, "Controller number must be between 0 and 5"
+
+    payload = struct.pack("<B", controller)
+    ret_code, ret_data = make_transaction(HostCommand.RECV_TX_EVENTS, payload)
+    if ret_code != CommandResponse.CMD_RESPONSE_OK:
+        raise Exception(f"Failed to get TX events: {CommandResponse(ret_code).name}")
+    
+    events = []
+    for i in range(0, len(ret_data), 9):
+        event_data = ret_data[i:i+9]
+        if len(event_data) < 9:
+            print(f"Warning: Incomplete TX event data received (expected 9 bytes, got {len(event_data)}), skipping")
+            continue
+        events.append(CANTXEvent(event_data))
+    return events
+
+
+
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+send_can_frame(0, 0x123, b"\xDE\xAD\xBE\xEF\xBE\xEF\xDE\xAD", FrameOption.EXTENDED | FrameOption.USE_UREF, user_ref=0xCAFEBABE)
+
+print(get_can_tx_events(0))
+print(get_can_rx_events(1))

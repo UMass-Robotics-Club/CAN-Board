@@ -32,13 +32,22 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 
+# mcp25xxfd library
+file(GLOB mcp25xxfdSources ./lib/mcp25xxfd/*.c)
+add_library(mcp25xxfd ${mcp25xxfdSources})
+target_include_directories(mcp25xxfd PUBLIC ./lib/mcp25xxfd)
+target_compile_definitions(mcp25xxfd PUBLIC HOST_RP2040 MCP251863)
+
+target_link_libraries(mcp25xxfd pico_stdlib hardware_spi hardware_gpio)
+
+# main application
 file(GLOB cSources ./src/*.c)
 add_executable(${PROJECT_NAME} ${cSources})
 
 target_include_directories(${PROJECT_NAME} PUBLIC ./include)
 
 # add pico_stdlib library which aggregates commonly used features
-target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_spi hardware_gpio pico_multicore)
+target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_spi hardware_gpio mcp25xxfd)
 
 # create map/bin/hex/uf2 file in addition to ELF.
 pico_add_extra_outputs(${PROJECT_NAME})

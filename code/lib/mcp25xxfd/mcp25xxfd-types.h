@@ -19,6 +19,13 @@
 
 #include "canapi.h"
 
+#if defined(HOST_CANPICO) || defined(HOST_RP2040)
+#include "rp2/mcp25xxfd-rp2.h"
+#else
+#error "Unknown host"
+#endif
+// Other host platforms with the MCP25xxFD will be included here
+
 // Target-specific data types for MCP25xxFD CAN controller
 typedef struct {
     uint32_t seq_bad;                               // Number of times the SEQ field was bad

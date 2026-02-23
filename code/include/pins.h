@@ -9,9 +9,9 @@
 #define CAN_SPI_TX 3
 #define CAN_SPI_RX 4
 
-uint8_t can_spi_cs_pins[6] = {5,6,7,8,9,10};
-uint8_t can_int_pins[6] = {29,25,23,21,19,17};
-uint8_t can_rx_int_pins[6] = {28,24,22,20,18,16};
+static uint8_t can_spi_cs_pins[6] = {5,6,7,8,9,10};
+static uint8_t can_int_pins[6] = {29,25,23,21,19,17};
+static uint8_t can_rx_int_pins[6] = {28,24,22,20,18,16};
 
 // External UART
 #define EXT_UART uart0

@@ -21,12 +21,6 @@
 #ifndef CANAPI_H
 #define CANAPI_H
 
-
-// define CAN controller and host to make library happy
-#define MCP251863
-#define HOST_RP2040
-
-
 #include <stdint.h>
 
 // The MCP25xxFD drivers support the MCP2517FD, MCP2518FD and MCP251863 CAN
@@ -43,9 +37,9 @@
 #endif
 
 #if defined(MCP25xxFD)
-#include "mcp25xxfd/mcp25xxfd-types.h"
+#include "mcp25xxfd-types.h"
 #if defined(HOST_RP2040)
-#include "mcp25xxfd/rp2/mcp25xxfd-rp2.h"
+#include "rp2/mcp25xxfd-rp2.h"
 #else
 #error "Unknown host"
 #endif
@@ -360,7 +354,7 @@ typedef struct {
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if defined(MCP25xxFD)
-#include "mcp25xxfd/mcp25xxfd-inline.h"
+#include "mcp25xxfd-inline.h"
 #else
 #error "Unknown CAN controller"
 #endif
@@ -400,7 +394,6 @@ can_status_t can_get_status(can_controller_t *controller);
 void can_status_request_recover(can_controller_t *controller);
 
 //////////////////////////////////////////// CAN frame /////////////////////////////////////////////
-
 /// @brief Put the CAN frame into the queue (priority or FIFO)
 /// @param fifo If true, puts the frame into the FIFO queue that feeds into the priority queue
 can_errorcode_t can_send_frame(can_controller_t *controller, const can_frame_t *frame, bool fifo);
@@ -616,10 +609,24 @@ uint32_t can_recv_pending(can_controller_t *controller);
 /// @exception If the block isn't big enough then will return 0 even if there are pending events
 uint32_t can_recv_as_bytes(can_controller_t *controller, uint8_t *dest, size_t n_bytes);
 
+/// @brief Receive an event as a block of bytes assuming the interrupt is already disabled, controller is not null, and the block is big enough
+/// @param dest Pointer to where the bytes should be written
+/// @param n_bytes Size of area to write the bytes
+/// @returns number of bytes in the block
+/// @exception If the block isn't big enough then will return 0 even if there are pending events
+/// @details TODO user generated
+uint32_t can_recv_as_bytes_safe(can_controller_t *controller, uint8_t *dest);
+
 /// @brief Receive an event
 /// @param event The application-allocated place to write an event to
 /// @returns true if an event was received
 bool can_recv(can_controller_t *controller, can_rx_event_t *event);
+
+/// @brief Receive an event assuming the interrupt is already disabled and controller is not null
+/// @param event The application-allocated place to write an event to
+/// @returns true if an event was received
+/// @details TODO user generated
+bool can_recv_safe(can_controller_t *controller, can_rx_event_t *event);
 
 /// @brief Get the event timestamp
 /// @param event The event returned by can_recv()
@@ -687,12 +694,26 @@ INLINE can_rx_overflow_event_t *can_event_get_overflow(can_rx_event_t *event)
 /// @returns true if an event was received
 bool can_recv_tx_event(can_controller_t *controller, can_tx_event_t *event);
 
+/// @brief Receive a frame transmission FIFO event assuming the interrupts are already disabled and controller is not null
+/// @param event The application-allocated place to write the event to
+/// @returns true if an event was received
+/// @details TODO user defined
+bool can_recv_tx_event_safe(can_controller_t *controller, can_tx_event_t *event);
+
 /// @brief Receive an event as a block of bytes
 /// @param dest Pointer to where the bytes should be written
 /// @param n_bytes Size of area to write the bytes
 /// @returns number of bytes in the block
 /// @exception If the block isn't big enough then will return 0 even if there are pending events
 uint32_t can_recv_tx_event_as_bytes(can_controller_t *controller, uint8_t *dest, size_t n_bytes);
+
+/// @brief Receive an event as a block of bytes assuming the interrupts are already disabled, controller is not null, and the buffer is big enough
+/// @param dest Pointer to where the bytes should be written
+/// @param n_bytes Size of area to write the bytes
+/// @returns number of bytes in the block
+/// @exception If the block isn't big enough then will return 0 even if there are pending events
+/// @details TODO user defined
+uint32_t can_recv_tx_event_as_bytes_safe(can_controller_t *controller, uint8_t *dest);
 
 /// @brief Return the number of events in the transmit event FIFO.
 /// @exception Is a minimum figure because more may have been added since the call returned.
@@ -838,8 +859,9 @@ void mcp25xxfd_irq_handler(can_controller_t *controller);
 // Initialize the SPI pins (set up the on-chip SPI controller and set its GPIO pins for SPI functions)
 inline void mcp25xxfd_spi_pins_init(can_interface_t *interface);
 
+// TODO made non inline to remove compiler warning
 // Enable interrupts on the GPIO pin connected to the controller's IRQ line
-inline void mcp25xxfd_spi_gpio_enable_irq(can_interface_t *interface);
+void mcp25xxfd_spi_gpio_enable_irq(can_interface_t *interface);
 
 // This is called to convert 4 bytes in memory to 32-bits where the lowest address byte is
 // at bits 7:0 of the word, which will then be transmitted to the MCP25xxFD in little endian
@@ -850,8 +872,9 @@ inline uint32_t mcp25xxfd_convert_bytes(uint32_t w);
 // Check interrupt GPIO pin for a specific interface to see if an interrupt is asserted 
 inline bool mcp25xxfd_spi_gpio_irq_asserted(can_interface_t *interface);
 
+// TODO made non inline to remove compiler warning
 // Disable interrupts on the GPIO pin connected to the controller's IRQ line
-inline void mcp25xxfd_spi_gpio_disable_irq(can_interface_t *interface);
+void mcp25xxfd_spi_gpio_disable_irq(can_interface_t *interface);
 
 // Select the controller via its SPI chip select I/O pin (active low) 
 inline void mcp25xxfd_spi_select(can_interface_t *interface);

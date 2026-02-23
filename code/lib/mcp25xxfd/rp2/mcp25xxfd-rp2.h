@@ -67,6 +67,12 @@ static inline void mcp25xxfd_spi_bind_canpico(can_interface_t *interface)
     interface->spi_cs = SPI_CS;
     interface->magic = 0x1e5515f0U;
 }
+
+#elif defined(HOST_RP2040)
+// #warning "No default binding for RP2040"
+#else
+// Other boards might have different SPI controllers, pins, etc.
+#error "Unknown board"
 #endif
 
 // Code on the RP2040 goes into RAM if it's time critical: the XIP flash is way too slow
@@ -101,13 +107,20 @@ static inline uint32_t mcp25xxfd_convert_bytes(uint32_t w)
     return w;
 }
 
-static inline void mcp25xxfd_spi_gpio_enable_irq(can_interface_t *interface)
-{
-    // If the GPIO interrupts are shared (i.e. another device is connected to GPIO interrupts) then
-    // disable them by disabling interrupts on the pin, so that the other devices can continue to
-    // handle interrupts through critical sections where the SPI is being accessed.
-    gpio_set_irq_enabled(interface->spi_irq, LEVEL_SENSITIVE_LOW, true);
-}
+/**
+ * Modified to work with multiple CAN controllers
+ *
+ * Overridden in can.c to disable GPIO interrupts for all CAN controllers when a SPI transaction is in progress.
+ * TODO: Find a better way to implement this and mcp25xxfd_spi_gpio_disable_irq
+ */
+WEAK void mcp25xxfd_spi_gpio_enable_irq(can_interface_t *interface);
+// static inline void mcp25xxfd_spi_gpio_enable_irq(can_interface_t *interface)
+// {
+//     // If the GPIO interrupts are shared (i.e. another device is connected to GPIO interrupts) then
+//     // disable them by disabling interrupts on the pin, so that the other devices can continue to
+//     // handle interrupts through critical sections where the SPI is being accessed.
+//    gpio_set_irq_enabled(interface->spi_irq, LEVEL_SENSITIVE_LOW, true);
+// }
 
 static inline bool mcp25xxfd_spi_gpio_irq_asserted(can_interface_t *interface)
 {
@@ -124,10 +137,11 @@ static inline bool mcp25xxfd_spi_gpio_irq_asserted(can_interface_t *interface)
     }
 }
 
-static inline void mcp25xxfd_spi_gpio_disable_irq(can_interface_t *interface)
-{
-    gpio_set_irq_enabled(interface->spi_irq, LEVEL_SENSITIVE_LOW, false);
-}
+WEAK void mcp25xxfd_spi_gpio_disable_irq(can_interface_t *interface);
+// static inline void mcp25xxfd_spi_gpio_disable_irq(can_interface_t *interface)
+// {
+//     gpio_set_irq_enabled(interface->spi_irq, LEVEL_SENSITIVE_LOW, false);
+// }
 
 static inline void mcp25xxfd_spi_select(can_interface_t *interface)
 {
