@@ -114,12 +114,18 @@ void handle_send_frame_cmd(uint8_t *data, uint16_t data_size)
         return;
     }
     send_frame_cmd_data_t *frame_cmd_data = (send_frame_cmd_data_t *)data;
+
+    bool extended = (frame_cmd_data->options & FRAME_OPTION_EXTENDED);
+    bool remote = (frame_cmd_data->options & FRAME_OPTION_REMOTE);
+    bool use_fifo = (frame_cmd_data->options & FRAME_OPTION_USE_FIFO);
+    bool use_uref = (frame_cmd_data->options & FRAME_OPTION_USE_UREF);
+
     debug("Send frame: Received header (controller=%hhd, extended=%hhd, remote=%hhd, fifo=%hhd, uref=%hhd, dlc=%hhd)\n",
           frame_cmd_data->controller,
-          (frame_cmd_data->options & FRAME_OPTION_EXTENDED) != 0,
-          (frame_cmd_data->options & FRAME_OPTION_REMOTE) != 0,
-          (frame_cmd_data->options & FRAME_OPTION_USE_FIFO) != 0,
-          (frame_cmd_data->options & FRAME_OPTION_USE_UREF) != 0,
+          extended,
+          remote,
+          use_fifo,
+          use_uref,
           frame_cmd_data->dlc);
 
     if (frame_cmd_data->controller >= NUM_CAN_CONTROLLERS)
@@ -138,28 +144,28 @@ void handle_send_frame_cmd(uint8_t *data, uint16_t data_size)
 
     // Calculate and verify sizes are correct
     uint8_t arbitration_idx = sizeof(send_frame_cmd_data_t);
-    uint8_t uref_idx = arbitration_idx + ((frame_cmd_data->options & FRAME_OPTION_EXTENDED) ? 4 : 2); // 16 bits for normal arbitration (11 bits) and 32 bits for extended (29 bits)
-    uint8_t data_idx = uref_idx + ((frame_cmd_data->options & FRAME_OPTION_USE_UREF) ? 4 : 0);        // 32 bits for user reference if included
-    uint8_t expected_size = data_idx + frame_cmd_data->dlc;                                         // Total expected size is the header + arbitration + optional user reference + data
+    uint8_t uref_idx = arbitration_idx + (extended ? 4 : 2); // 16 bits for normal arbitration (11 bits) and 32 bits for extended (29 bits)
+    uint8_t data_idx = uref_idx + (use_uref ? 4 : 0);        // 32 bits for user reference if included
+    uint8_t expected_size = data_idx + (remote ? 0 : frame_cmd_data->dlc);                                         // Total expected size is the header + arbitration + optional user reference + data
     if (data_size != expected_size)
     {
-        error("Send frame: Not enough data supplied for CAN frame (expected %hhd bytes, got %hhd bytes)\n", expected_size, data_size);
+        error("Send frame: Invalid amount of data supplied for CAN frame (expected %hhd bytes, got %hhd bytes)\n", expected_size, data_size);
         send_response_pkt(CMD_RESPONSE_CMD_MALFORMED, NULL, 0);
         return;
     }
 
     // Get arbitration ID
-    uint32_t arbitration;
+    uint32_t arbitration = 0;
     // We use memcpy here as it may not be word aligned
-    memcpy(&arbitration, data + arbitration_idx, (frame_cmd_data->options & FRAME_OPTION_EXTENDED) ? 4 : 2);
+    memcpy(&arbitration, data + arbitration_idx, (extended ? 4 : 2));
     debug("Send frame: Arbitration ID: %08x\n", arbitration);
 
     // Make frame
     can_frame_t frame;
-    can_make_frame(&frame, arbitration, arbitration, frame_cmd_data->dlc, data + data_idx, frame_cmd_data->options & FRAME_OPTION_REMOTE);
+    can_make_frame(&frame, extended, arbitration, frame_cmd_data->dlc, data + data_idx, remote);
 
     // Set user reference if included
-    if (frame_cmd_data->options & FRAME_OPTION_USE_UREF)
+    if (use_uref)
     {
         uint32_t uref;
         memcpy(&uref, data + uref_idx, 4);
@@ -168,7 +174,7 @@ void handle_send_frame_cmd(uint8_t *data, uint16_t data_size)
     }
 
     // Send frame
-    can_errorcode_t rc = send_can_frame(frame_cmd_data->controller, &frame, frame_cmd_data->options & FRAME_OPTION_USE_FIFO);
+    can_errorcode_t rc = send_can_frame(frame_cmd_data->controller, &frame, use_fifo);
     if (rc == CAN_ERC_NO_ERROR)
     {
         send_response_pkt(CMD_RESPONSE_OK, NULL, 0);
