@@ -2,7 +2,7 @@ import serial
 import struct
 import enum
 
-com = serial.Serial("/dev/ttyACM1", 115200)
+com = serial.Serial("COM3", 115200)
 
 
 class HostCommand(enum.IntEnum):
@@ -451,9 +451,6 @@ def MIT_dynamic_params(angle: float, speed: float,   kp: float, kd: float, torqu
 
 
 
-
-
-
 class SDOIndex(enum.IntEnum):
     MOTOR_STATE = 0x6040
     OPERATION_MODE = 0x6060
@@ -463,30 +460,23 @@ class SDOIndex(enum.IntEnum):
 
 
 
+if __name__ == "__main__":
+    
+    MOTOR_ID = 0x7F
+
+    MIT_set_operation_mode(MotorProtocol.MIT)
 
 
+    time.sleep(1)
 
-"""
-print(f"Device Type: {int.from_bytes(canopen_SDO_read(0x603F, 0x00, MOTOR_ID), 'little')}") # Read the "Device Type" object
+    print(get_can_rx_events(0))
 
-print("Setting motor to ready to enable")
-canopen_SDO_write_expedited(SDOIndex.MOTOR_STATE, 0x00, int.to_bytes(6, 2, 'little'), MOTOR_ID) 
-print("Setting motor to enabled")
-canopen_SDO_write_expedited(SDOIndex.MOTOR_STATE, 0x00, int.to_bytes(7, 2, 'little'), MOTOR_ID) 
+    #send_can_frame(0, MOTOR_ID, RS02_ENABLE)
 
-print("Configuring motor for velocity control mode...")
-print("Setting operation mode to velocity control (0x3)")
-canopen_SDO_write_expedited(SDOIndex.OPERATION_MODE, 0x00, int.to_bytes(3, 1, 'little'), MOTOR_ID)
-print("Setting torque limit to 50")
-canopen_SDO_write_expedited(SDOIndex.TARGET_TORQUE, 0x00, int.to_bytes(50, 2, 'little'), MOTOR_ID)
-print("Setting target velocity to 0 (safe start)")
-canopen_SDO_write_expedited(SDOIndex.TARGET_VELOCITY, 0x00, int.to_bytes(0, 4, 'little'), MOTOR_ID)
-print("Motor configured!")
+    # send_can_frame(0, MOTOR_ID, MIT_dynamic_params(3, 22, 250, 2.5, 7))
 
-input("Press Enter to start motor at target velocity of 100...")
-canopen_SDO_write_expedited(SDOIndex.MOTOR_STATE, 0x00, int.to_bytes(15, 2, 'little'), MOTOR_ID)
-canopen_SDO_write_expedited(SDOIndex.TARGET_VELOCITY, 0x00, int.to_bytes(100, 4, 'little'), MOTOR_ID)
-time.sleep(10)
-print("Stopping motor...")
-canopen_SDO_write_expedited(SDOIndex.TARGET_VELOCITY, 0x00, int.to_bytes(0, 4, 'little'), MOTOR_ID)
-canopen_SDO_write_expedited(SDOIndex.MOTOR_STATE, 0x00, int.to_bytes(1, 2, 'little'), MOTOR_ID) """
+    # time.sleep(2)
+    
+    # send_can_frame(0, MOTOR_ID, RS02_MIT_SET_ZERO)
+
+
