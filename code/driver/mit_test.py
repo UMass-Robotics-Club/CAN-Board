@@ -2,7 +2,7 @@ import serial
 import struct
 import enum
 
-com = serial.Serial("COM3", 115200)
+com = serial.Serial("/dev/ttyACM0", 115200)
 
 
 class HostCommand(enum.IntEnum):
@@ -200,6 +200,12 @@ def get_can_rx_events(controller: int) -> list[CANRXEvent]:
         events.append(CANRXEvent(event_data))
 
     return events
+
+def get_can_rx_events_blocking(controller: int) -> list[CANRXEvent]:
+    while True:
+        events = get_can_rx_events(controller)
+        if events:
+            return events
 
 def get_can_tx_events(controller: int) -> list[CANTXEvent]:
     assert 0 <= controller < 6, "Controller number must be between 0 and 5"
@@ -428,26 +434,7 @@ RS02_MIT_MODE = b"\x01\x02\x03\x04\x05\x06\x02"
 RS02_MIT_SET_ZERO = b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFE"
 
 
-def MIT_set_operation_mode(protocol: MotorProtocol)->bytes:
-    return b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF" + protocol.to_bytes()
 
-def MIT_dynamic_params(angle: float, speed: float,   kp: float, kd: float, torque: float)->bytes:
-    
-    assert angle <= 12.57 and angle >= -12.57  #2 bytes
-    assert speed <= 44 and speed >= -44 #12 bits
-    assert kp <= 500 and kp >= 0 #12 bits
-    assert kd <= 5 and kd >= 0 #12 bits
-    assert torque <= 17 and torque >= -17 #12 bits
-
-    angle_i = int(((angle + 12.57)*65535) / (12.57*2))
-    speed_i = int(((speed + 44)*4096)/(44*2))
-    kp_i = int(kp/500 * 4096)
-    kd_i = int(kd/5 * 4096)
-    torque_i = int(((torque + 17)*4096)/(17*2))
-
-
-    return int.to_bytes(angle_i<<48 | speed_i << 36 | kp_i << 24 | kd_i << 12 | torque_i, 8, "little")
-     
 
 
 
@@ -461,22 +448,37 @@ class SDOIndex(enum.IntEnum):
 
 
 if __name__ == "__main__":
-    
-    MOTOR_ID = 0x7F
 
-    MIT_set_operation_mode(MotorProtocol.MIT)
+    MOTOR_ID = 0x0
 
+    # # Enable motor
+    # send_can_frame(0, MOTOR_ID, RS02_ENABLE)
+    # print(get_can_rx_events_blocking(0))
 
-    time.sleep(1)
-
-    print(get_can_rx_events(0))
-
-    #send_can_frame(0, MOTOR_ID, RS02_ENABLE)
-
-    # send_can_frame(0, MOTOR_ID, MIT_dynamic_params(3, 22, 250, 2.5, 7))
-
-    # time.sleep(2)
-    
+    # # Set zero
     # send_can_frame(0, MOTOR_ID, RS02_MIT_SET_ZERO)
+    # print(get_can_rx_events_blocking(0))
+
+    # # Run with dynamic parameters for 1 second
+    # send_can_frame(0, MOTOR_ID, MIT_dynamic_params(1.0, 10.0, 100.0, 1.0, 10.0))
+    # print(get_can_rx_events_blocking(0))
+
+    # send_can_frame(0, MOTOR_ID, RS02_ENABLE)
+    # print(get_can_rx_events_blocking(0))
+
+    # time.sleep(1)
 
 
+    # # Disable motor
+    # send_can_frame(0, MOTOR_ID, RS02_DISABLE)
+    # print(get_can_rx_events_blocking(0))
+
+    while True:
+        send_can_frame(0, MOTOR_ID, b"\xFF" * 6 + b"\xDF" + b"\x02")
+        events = get_can_rx_events(0)
+        if events:
+            for event in events:
+                print(event)
+                print(MOTOR_ID)
+            break
+        MOTOR_ID += 1
