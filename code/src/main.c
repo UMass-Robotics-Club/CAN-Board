@@ -10,11 +10,6 @@
 #include "logging.h"
 #include "can.h"
 
-// TODO figure out why uint16 is not working in intellisense
-// Temp fix
-//  typedef unsigned short uint16_t;
-//  typedef unsigned int uint32_t;
-
 ///////////////////////////////////////
 // User params
 ///////////////////////////////////////
@@ -318,6 +313,35 @@ void loop()
     free(data);
 }
 
+void speed_test(int controller_num, uint32_t test_duration_ms)
+{
+    info("Starting speed test on controller %d...\n", controller_num);
+
+    // Speed test
+    uint32_t num_frames_sent = 0;
+
+    can_frame_t frame;
+    can_make_frame(&frame, true, 0xdeadbeef, 8, (uint8_t[]){0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef}, false);
+
+    uint32_t start_time = time_us_32();
+    while (time_us_32() - start_time < test_duration_ms * 1000) // test_duration_ms seconds
+    {
+        can_errorcode_t rc = send_can_frame(controller_num, &frame, false);
+        if (rc == CAN_ERC_NO_ERROR)
+            num_frames_sent++;
+    }  
+
+    info("Speed test completed. Sent %lu frames in %lu ms.\n", num_frames_sent, test_duration_ms);
+    // Read out all target_specific flags in can controller to see if there were any errors
+    info("Target-specific flags for controller %d:\n", controller_num);
+    info("  seq_bad: %lu\n", can_controllers[controller_num].target_specific.seq_bad);
+    info("  txqsta_bad: %lu\n", can_controllers[controller_num].target_specific.txqsta_bad);
+    info("  txqua_bad: %lu\n", can_controllers[controller_num].target_specific.txqua_bad);
+    info("  bus_off: %lu\n", can_controllers[controller_num].target_specific.bus_off);
+    info("  spurious: %lu\n", can_controllers[controller_num].target_specific.spurious);
+    info("  crc_bad: %lu\n", can_controllers[controller_num].target_specific.crc_bad);
+}
+
 int main()
 {
     stdio_init_all();
@@ -343,6 +367,14 @@ int main()
 
     info("CAN board ready!\n");
 
+    // for (int i = 0; i < NUM_CAN_CONTROLLERS; i++)
+    // {
+    //     speed_test(i, 1000);
+    //     speed_test(NUM_CAN_CONTROLLERS - 1 - i, 1000);
+    // }
+    
+
     while (1)
         loop();
+
 }

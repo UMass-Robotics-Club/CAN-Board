@@ -4,6 +4,7 @@
 #include "canapi.h"
 
 #define NUM_CAN_CONTROLLERS 6
+#define CAN_SETUP_MAX_RETRIES 5
 #define CAN_TRANSMIT_MAX_TRYS 1
 
 extern can_controller_t can_controllers[NUM_CAN_CONTROLLERS];

@@ -5,10 +5,10 @@
 
 // enable different levels of logging
 // #define ENABLE_TEST // For testing code and debugging during development, not expected to be used in production (RUNS IN IRQ HANDLER so it interferes with protocol!)
-// #define ENABLE_DEBUG
-// #define ENABLE_INFO
-// #define ENABLE_WARNING
-// #define ENABLE_ERROR
+#define ENABLE_DEBUG
+#define ENABLE_INFO
+#define ENABLE_WARNING
+#define ENABLE_ERROR
 
 #ifdef ENABLE_TEST
 #define test(...) printf("[TEST] "); printf(__VA_ARGS__)

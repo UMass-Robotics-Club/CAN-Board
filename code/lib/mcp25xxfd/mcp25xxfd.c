@@ -1542,6 +1542,7 @@ can_errorcode_t TIME_CRITICAL can_setup_controller(can_controller_t *controller,
 
     // Enable SPI interrupts on controller IRQ pin. GPIO interrupts will already have been enabled
     // by the initialization of the pins in mcp25xxfd_spi_pins_init()
+    // TODO enable
     mcp25xxfd_spi_gpio_enable_irq(spi_interface);
 
     return CAN_ERC_NO_ERROR;

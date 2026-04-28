@@ -107,7 +107,7 @@ void setup_can_controllers(can_bitrate_t *bitrate)
         debug("CAN setup: Controller %d: Staring setup...\n", i);
     
         // setup controller
-        while (true)
+        for (uint8_t retry = 0; retry < CAN_SETUP_MAX_RETRIES; retry++)
         {
             can_errorcode_t rc = can_setup_controller(can_controllers + i, bitrate, CAN_NO_FILTERS, CAN_MODE_NORMAL, CAN_OPTION_HARD_RESET | CAN_OPTION_RECV_ERRORS | CAN_OPTION_RECORD_TX_EVENTS);
 
@@ -116,8 +116,15 @@ void setup_can_controllers(can_bitrate_t *bitrate)
 
             // This can fail if the CAN transceiver isn't powered up properly. That might happen
             // if the board had 3.3V but not 5V (the transceiver needs 5V to operate).
-            error("CAN Setup: Controller %d: Failed to initialize with error code %d. Will retry in 1 second...\n", i, rc);
-            sleep_ms(1000);
+            if (retry + 1 == CAN_SETUP_MAX_RETRIES)
+            {
+                error("CAN Setup: Controller %d: Failed to initialize with error code %d after %d retries.\n", i, rc, retry);
+            }
+            else
+            {
+                error("CAN Setup: Controller %d: Failed to initialize with error code %d. Will retry in 1 second...\n", i, rc);
+                sleep_ms(1000);
+            }
         }
 
         debug("CAN setup: Controller %d: Done setting up!\n", i);

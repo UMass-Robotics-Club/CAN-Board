@@ -31,21 +31,21 @@ class FrameOption(enum.IntFlag):
 
 
 class CANErrorCode(enum.IntEnum):
-    CAN_ERC_NO_ERROR = 0,                               # OK
-    CAN_ERC_BAD_BITRATE=1,                                # Baud rate settings are not legal
-    CAN_ERC_RANGE=2,                                      # Range error on parameters
-    CAN_ERC_BAD_INIT=3,                                   # Can't get the controller to initialize
-    CAN_ERC_NO_ROOM=4,                                    # No room
-    CAN_ERC_NO_ROOM_PRIORITY=5,                           # No room in the transmit priority queue
-    CAN_ERC_NO_ROOM_FIFO=6,                               # No room in the transmit FIFO queue
-    CAN_ERC_BAD_WRITE=7,                                  # Write to a controller register failed
-    CAN_ERC_NO_INTERFACE=8,                               # No interface binding set for the controller
+    CAN_ERC_NO_ERROR            = 0 # OK
+    CAN_ERC_BAD_BITRATE         = 1 # Baud rate settings are not legal
+    CAN_ERC_RANGE               = 2 # Range error on parameters
+    CAN_ERC_BAD_INIT            = 3 # Can't get the controller to initialize
+    CAN_ERC_NO_ROOM             = 4 # No room
+    CAN_ERC_NO_ROOM_PRIORITY    = 5 # No room in the transmit priority queue
+    CAN_ERC_NO_ROOM_FIFO        = 6 # No room in the transmit FIFO queue
+    CAN_ERC_BAD_WRITE           = 7 # Write to a controller register failed
+    CAN_ERC_NO_INTERFACE        = 8 # No interface binding set for the controller
 
 
 class EventType(enum.IntEnum):
-    CAN_EVENT_TYPE_TRANSMITTED_FRAME = 0,       # Frame transmitted
-    CAN_EVENT_TYPE_RECEIVED_FRAME = 1,          # Frame received
-    CAN_EVENT_TYPE_OVERFLOW = 2,                # FIFO overflow happened
+    CAN_EVENT_TYPE_TRANSMITTED_FRAME = 0       # Frame transmitted
+    CAN_EVENT_TYPE_RECEIVED_FRAME = 1          # Frame received
+    CAN_EVENT_TYPE_OVERFLOW = 2                # FIFO overflow happened
     CAN_EVENT_TYPE_CAN_ERROR = 3                # CAN error frame received
 
 
@@ -153,9 +153,10 @@ class CANChannel:
         return self.board.get_tx_events(self.controller_num)
 
 class CANBoard:
-    def __init__(self, port: str = "/dev/ttyACM0", baudrate: int = 115200):
+    def __init__(self, port: str = "/dev/ttyACM0", baudrate: int = 115200, log_non_command_data: bool = True):
         self.com = serial.Serial(port, baudrate)
         self.channels = [CANChannel(self, i) for i in range(6)] # Create 6 channels (0-5)
+        self.log_non_command_data = log_non_command_data
 
     def make_transaction(self, command: int, payload: bytes) -> tuple[int, bytes]:
         # Send packet
@@ -173,7 +174,7 @@ class CANBoard:
             non_cmd_data.extend(byte)
         
         # print any non-command data received (e.g. debug messages)
-        if non_cmd_data:
+        if non_cmd_data and self.log_non_command_data:
             print("Received non-command data from device:")
             for line in non_cmd_data.split(b"\n"):
                 if not line.strip():
