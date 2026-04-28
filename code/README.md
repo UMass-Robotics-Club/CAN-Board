@@ -51,3 +51,33 @@ sudo openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -c "adapter speed 5
 ```
 gdb ./build/can_board.elf -ex 'set arch arm' -ex 'target extended-remote :3333'
 ```
+
+
+# Better Communication Protocol
+
+## Overall Architecture
+The protocol is half duplex (even if the underlying transport is full duplex) and is based on a host-peripheral command architecture. The host will send a command along with any needed data and the peripheral will respond with a status code along with any data to return. The host MUST wait to the peripheral to respond before sending another command. If the peripheral does not receive a packet in time then it will send a timeout packet back. All data and commands will be wrapped in a general packet structure defined below. 
+
+### General Command Structure
+Host -> Peripheral:
+- Frame start (1 byte): 0xAA
+- Command (1 byte): The command that the controller should execute
+- Data size (2 bytes): The size of the data included
+- Data (n bytes): The data for the command (command specific)
+- Frame end (1 byte): 0x55
+
+Peripheral -> Host:
+- Frame start (1 byte): 0xAA
+- Response Code (1 byte): Status of the command
+- Data size (2 bytes): The size of the data included
+- Data (n bytes): The data for the command (command specific)
+- Frame end (1 byte): 0x55
+
+### Specific Command Structure
+#### Send CAN Frame Command
+Host -> Peripheral Data:
+- Controller ID (1 byte): The ID of the controller to send the frame on
+- Frame Options (1 byte): The options for the frame (e.g. extended ID, remote frame, etc.)
+- Data Length Code (1 byte): The length of the data in bytes (0-8)
+- Arbitration ID (2-4 bytes): The arbitration ID of the frame
+- Frame Data (0-8 bytes): The data to be sent in the frame

@@ -60,7 +60,6 @@ Notes:
 ## Project Structure
 * `CAD`: The kiCAD project (PCB/schematics)
     * `Components`: Imported components each in their own folder
-    * `Fab`: All the fabrication files including BOM, gerber, and component placement
 * `code`: Firmware for the microcontroller in a pretty standard C project structure
     * `include`: Header files
     * `src`: C/C++ files
