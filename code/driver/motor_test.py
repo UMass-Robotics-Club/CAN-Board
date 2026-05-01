@@ -2,7 +2,7 @@ import enum
 import time
 import struct
 
-from can_connector import CANBoard, CANChannel, FrameOption, EventType
+from can_api import CANBoard, CANChannel, FrameOption, EventType
 
 class MotorProtocol(enum.IntEnum):
     PRIVATE = 0
@@ -49,7 +49,7 @@ def private_get_communication_response(ch: CANChannel, host_id: int, timeout: fl
 def private_get_single_param(ch: CANChannel, host_id: int, motor_id: int, Index: int) -> bytes:
     data = int.to_bytes(Index, 2, "little") + bytes(6)
     private_send_communication_frame(ch, host_id, motor_id, CommunicationType.GET_SINGLE_PARAMETER, data)
-    return private_get_communication_response(ch, host_id)
+    return private_get_communication_response(ch, host_id)[2]
 
 def _private_get_MCU_id(ch: CANChannel, host_id: int, motor_id: int, timeout: float = 1.0) -> bytes:
     start = time.time()
@@ -191,45 +191,84 @@ def mit_set_motor_protocol(ch: CANChannel, protocol: MotorProtocol, motor_id: in
     
     raise Exception("No response received for mit_set_motor_protocol")
 
-def _mit_dynamic_params(angle: float, speed: float,   kp: float, kd: float, torque: float)->bytes:
-    
-    assert angle <= 12.57 and angle >= -12.57  #2 bytes
-    assert speed <= 44 and speed >= -44 #12 bits
-    assert kp <= 500 and kp >= 0 #12 bits
-    assert kd <= 5 and kd >= 0 #12 bits
-    assert torque <= 17 and torque >= -17 #12 bits
+def _float_to_uint(x: float, x_min: float, x_max: float, bits: int) -> int:
+    """Convert float to unsigned int with given range and bit width."""
+    assert x_min <= x <= x_max, f"Value {x} out of range [{x_min}, {x_max}]"
+    span = x_max - x_min
+    return int((x - x_min) * ((1 << bits) - 1) / span)
 
-    angle_i = int(((angle + 12.57)*65535) / (12.57*2))
-    speed_i = int(((speed + 44)*4096)/(44*2))
-    kp_i = int(kp/500 * 4096)
-    kd_i = int(kd/5 * 4096)
-    torque_i = int(((torque + 17)*4096)/(17*2))
 
-    print(f"angle_i: {angle_i}, speed_i: {speed_i}, kp_i: {kp_i}, kd_i: {kd_i}, torque_i: {torque_i}")
-    return int.to_bytes(angle_i | speed_i << 16 | kp_i << 28 | kd_i << 40 | torque_i << 52, 8, "little")
+def _mit_pack_dynamic_params(p: float, v: float, kp: float, kd: float, t: float) -> bytes:
+    """
+    Pack MIT motor command into 8-byte CAN frame.
+
+    Inputs are floats in their respective ranges.
+    Returns: 8 bytes with packed command according to MIT protocol specification.
+    """
+
+    # ---- Define limits (adjust per motor spec) ----
+    P_MIN, P_MAX = -12.5, 12.5
+    V_MIN, V_MAX = -45.0, 45.0
+    KP_MIN, KP_MAX = 0.0, 500.0
+    KD_MIN, KD_MAX = 0.0, 5.0
+    T_MIN, T_MAX = -18.0, 18.0
+
+    # ---- Convert to integers ----
+    p_int  = _float_to_uint(p,  P_MIN,  P_MAX, 16)
+    v_int  = _float_to_uint(v,  V_MIN,  V_MAX, 12)
+    kp_int = _float_to_uint(kp, KP_MIN, KP_MAX, 12)
+    kd_int = _float_to_uint(kd, KD_MIN, KD_MAX, 12)
+    t_int  = _float_to_uint(t,  T_MIN,  T_MAX, 12)
+
+    # ---- Pack bits ----
+    data = bytearray(8)
+
+    data[0] = (p_int >> 8) & 0xFF
+    data[1] = p_int & 0xFF
+    data[2] = (v_int >> 4) & 0xFF
+    data[3] = ((v_int & 0xF) << 4) | ((kp_int >> 8) & 0xF)
+    data[4] = kp_int & 0xFF
+    data[5] = (kd_int >> 4) & 0xFF
+    data[6] = ((kd_int & 0xF) << 4) | ((t_int >> 8) & 0xF)
+    data[7] = t_int & 0xFF
+
+    return bytes(data)
      
 def mit_send_command(ch: CANChannel, motor_id: int, cmd: MITCommand):
     payload = b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF" + cmd.to_bytes(1, "little")
     ch.send_frame(motor_id, payload)
 
 def mit_send_dynamic_command(ch: CANChannel, motor_id: int, angle: float, speed: float, kp: float, kd: float, torque: float):
-    payload = _mit_dynamic_params(angle, speed, kp, kd, torque)
+    payload = _mit_pack_dynamic_params(angle, speed, kp, kd, torque)
     ch.send_frame(motor_id, payload)
 
 if __name__ == "__main__":
 
-    MOTOR_ID = 0x1
+    MOTOR_ID = 0x01
 
-    SPEED = 10
-    KP = 100
+    SPEED = 1
+    KP = 10
     KD = 1
-    TORQUE = 5    
+    TORQUE = 5   
 
-    board = CANBoard("/dev/ttyACM0", 115200)
+    START_ANGLE = 0
+    END_ANGLE = 10
+    STEPS = 50
+
+    board = CANBoard("COM11", 115200)
     ch = board.channels[0]
+
 
     print("Sending ENABLE command...")
     mit_send_command(ch, MOTOR_ID, MITCommand.ENABLE)
+
+    # angle = START_ANGLE
+    # direction = 1
+    # while True:
+    #     mit_send_dynamic_command(ch, MOTOR_ID, angle, SPEED, KP, KD, TORQUE)
+    #     angle += (END_ANGLE - START_ANGLE) / STEPS * direction
+    #     if angle > END_ANGLE or angle < START_ANGLE:
+    #         direction *= -1
 
     while True:
         user_input = input("Enter target angle or 'q' to quit: ")

@@ -1,10 +1,11 @@
-# TODO add automatic polls for CAN events in a background thread and allows registering callbacks for different types of events (e.g. received frame with specific arbitration ID, transmitted frame with specific user ref, etc.)
-
 import time
 import serial
 import struct
 import enum
 
+#####################
+# Constants from the firmware API
+#####################
 class HostCommand(enum.IntEnum):
     SEND_FRAME = 0x00
     RECV_RX_EVENTS = 0x01
@@ -49,6 +50,9 @@ class EventType(enum.IntEnum):
     CAN_EVENT_TYPE_CAN_ERROR = 3                # CAN error frame received
 
 
+##############
+# Data structures for CAN events
+##############
 class CANTXEvent:
     def __init__(self, data: bytes):
         assert len(data) == 9, "TX event data must be 9 bytes"
@@ -135,36 +139,21 @@ class CANRXEvent:
         return "CANRXEvent(type={}, timestamp={}, frame={}, error={}, overflow={})".format(
             self.type, self.timestamp, repr(self.frame), repr(self.error), repr(self.overflow))
 
-class CANChannel:
-    def __init__(self, board: CANBoard, controller_num: int):
-        self.board = board
-        self.controller_num = controller_num
-
-    def send_frame(self, arbitration_id: int, data: bytes = b"", options: FrameOption = FrameOption.NONE, user_ref: int = 0):
-        self.board.send_frame(self.controller_num, arbitration_id, data, options=options, user_ref=user_ref)
-
-    def get_rx_events(self) -> list[CANRXEvent]:
-        return self.board.get_rx_events(self.controller_num)
-
-    def get_rx_events_blocking(self, timeout: float = 0) -> list[CANRXEvent]:
-        return self.board.get_rx_events_blocking(self.controller_num, timeout)
-
-    def get_tx_events(self) -> list[CANTXEvent]:
-        return self.board.get_tx_events(self.controller_num)
-
+#####################
+# Main API class for interacting with the CAN board
+#####################
 class CANBoard:
     def __init__(self, port: str = "/dev/ttyACM0", baudrate: int = 115200, log_non_command_data: bool = True):
         self.com = serial.Serial(port, baudrate)
         self.channels = [CANChannel(self, i) for i in range(6)] # Create 6 channels (0-5)
         self.log_non_command_data = log_non_command_data
 
-    def make_transaction(self, command: int, payload: bytes) -> tuple[int, bytes]:
+    def make_transaction(self, command: int, payload: bytes, timeout: float = 1.0) -> tuple[int, bytes]:
         # Send packet
         send_bytes = b"\xAA" + struct.pack("<BH", command, len(payload)) + payload + b"\x55"
         self.com.write(send_bytes)
 
         # Wait for response
-        # TODO add timeout and error handling
         # Parse until 0xAA is found (print any messages)
         non_cmd_data = bytearray()
         while True:
@@ -183,8 +172,10 @@ class CANBoard:
 
         
         ret_code, length = struct.unpack("<BH", self.com.read(3))
+        self.com.timeout = timeout
         payload = self.com.read(length) if length else b"" # Read the payload
         end = self.com.read(1)
+        self.com.timeout = None # Reset timeout to blocking
 
         assert end == b"\x55", f"Expected frame end byte 0x55, but got {end}"
 
@@ -250,37 +241,22 @@ class CANBoard:
             events.append(CANTXEvent(event_data))
         return events
 
+#####################
+# Helper CAN Channel Class
+#####################
+class CANChannel:
+    def __init__(self, board: CANBoard, controller_num: int):
+        self.board = board
+        self.controller_num = controller_num
 
-def perf_test(board: CANBoard):
-    import time
-    import random
+    def send_frame(self, arbitration_id: int, data: bytes = b"", options: FrameOption = FrameOption.NONE, user_ref: int = 0):
+        self.board.send_frame(self.controller_num, arbitration_id, data, options=options, user_ref=user_ref)
 
-    # Small 10 sec performance test
-    start = time.time()
-    count = 0
-    while time.time() - start < 10:
-        extended = random.choice([True, False])
-        use_uref = random.choice([True, False])
-        
-        arbitration_id = random.randint(0, 0x1FFFFFFF if extended else 0x7FF)
-        data = random.randbytes(random.randint(0, 8))
-        uref = random.randint(0, 0xFFFFFFFF) if use_uref else 0
-        options = FrameOption(0)
-        if extended:
-            options |= FrameOption.EXTENDED
-        if use_uref:
-            options |= FrameOption.USE_UREF
+    def get_rx_events(self) -> list[CANRXEvent]:
+        return self.board.get_rx_events(self.controller_num)
 
-        board.send_frame(0, arbitration_id, data, options=options, user_ref=uref)
-        while True:
-            tx_events = board.get_tx_events(0)
-            if tx_events:
-                break
-        while True:
-            rx_events = board.get_rx_events(1)
-            if rx_events:
-                break
-        
-        count += 1
+    def get_rx_events_blocking(self, timeout: float = 0) -> list[CANRXEvent]:
+        return self.board.get_rx_events_blocking(self.controller_num, timeout)
 
-    print(f"Sent and received {count} frames in 10 seconds ({count/10:.2f} frames/sec)")
+    def get_tx_events(self) -> list[CANTXEvent]:
+        return self.board.get_tx_events(self.controller_num)

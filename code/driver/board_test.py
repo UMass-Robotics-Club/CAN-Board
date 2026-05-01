@@ -1,4 +1,4 @@
-from can_connector import CANBoard, EventType, FrameOption
+from driver.can_api import CANBoard, EventType, FrameOption
 import time
 PORT = "COM11"
 
