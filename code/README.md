@@ -74,6 +74,19 @@ Peripheral -> Host:
 - Frame end (1 byte): 0x55
 
 ### Specific Command Structure
+
+#### (0x00) Get Board Status Command
+
+#### (0x01) Get Controller Status Command
+
+#### (0x02) Get Controller Time Command
+
+#### (0x03) Setup CAN Controller Command
+
+#### (0x04) Send CAN Frame Command
+
+
+
 #### Send CAN Frame Command
 Host -> Peripheral Data:
 - Controller ID (1 byte): The ID of the controller to send the frame on
